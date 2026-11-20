@@ -142,6 +142,7 @@ export function createDetail({ projects, gallery, hud, reducedMotion }) {
     busy = true
     isOpen = true
     returnRect = opts.returnRect || null
+    $('.detail__back').innerHTML = `<span aria-hidden="true">←</span> Back to ${returnRect ? 'index' : 'gallery'}`
     fill(pi)
     hooks.open.forEach((fn) => fn(pi))
     gallery.setInteractive(false)
