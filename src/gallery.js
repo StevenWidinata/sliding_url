@@ -383,7 +383,8 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   function frame() {
     if (!running) return
     requestAnimationFrame(frame)
-    const dt = Math.min(clock.getDelta(), 0.05)
+    const rawDt = Math.min(clock.getDelta(), 0.25) // real time, for tweens (stays correct at low fps)
+    const dt = Math.min(rawDt, 0.05) // clamped, for spring/easing stability
     const now = performance.now()
 
     if (!dragging && now - lastWheel > 170) target = Math.round(target)
@@ -404,7 +405,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     }
 
     if (dollyTween) {
-      dollyTween.t = Math.min(1, dollyTween.t + dt / dollyTween.dur)
+      dollyTween.t = Math.min(1, dollyTween.t + rawDt / dollyTween.dur)
       dolly = dollyTween.from + (dollyTween.to - dollyTween.from) * easeInOut(dollyTween.t)
       if (dollyTween.t >= 1) {
         const done = dollyTween.done
@@ -412,7 +413,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
         done()
       }
     }
-    if (intro.t < 1) intro.t = Math.min(1, intro.t + dt / intro.dur)
+    if (intro.t < 1) intro.t = Math.min(1, intro.t + rawDt / intro.dur)
     const walk = intro.t < 1 ? 1 - easeInOut(intro.t) : 0
 
     // hover lift
@@ -435,6 +436,34 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     camera.rotateX(tilt.pitch)
 
     renderer.render(scene, camera)
+    adaptQuality(rawDt)
+  }
+
+  // adaptive quality: if the device struggles, drop the floor reflection, then resolution
+  let perfFrames = 0
+  let perfTime = 0
+  let perfLevel = 0
+  function adaptQuality(dt) {
+    if (perfLevel >= 2 || document.hidden) return
+    perfFrames++
+    perfTime += dt
+    if (perfFrames < 45 && perfTime < 1.5) return
+    const avg = perfTime / perfFrames
+    perfFrames = 0
+    perfTime = 0
+    if (avg < 1 / 40) return
+    perfLevel++
+    if (perfLevel === 1 && reflector) {
+      scene.remove(reflector)
+      reflector.dispose()
+      reflector = null
+      floorMat.transparent = false
+      floorMat.needsUpdate = true
+    } else {
+      perfLevel = 2
+      renderer.setPixelRatio(1)
+      layout()
+    }
   }
 
   // ---------- public api ----------
