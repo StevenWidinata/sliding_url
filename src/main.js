@@ -9,6 +9,7 @@ import { createHud, addPill } from './ui.js'
 import { createDetail } from './detail.js'
 import { createIntro } from './intro.js'
 import { createAudio } from './audio.js'
+import { createLiving } from './living.js'
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4
@@ -48,6 +49,8 @@ async function boot() {
   gallery.on('open', open)
   gallery.on('interact', () => hud.hideHint())
   detail = createDetail({ projects, gallery, hud, reducedMotion })
+
+  createLiving({ gallery, detail, projects, reducedMotion })
 
   // sound
   const soundPill = addPill(hud.pills, {

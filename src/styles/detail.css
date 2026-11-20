@@ -130,6 +130,15 @@
   display: block;
 }
 
+.detail__media video {
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+}
+
+.detail__media video.is-playing {
+  opacity: 1;
+}
+
 .detail__flyer {
   position: fixed;
   z-index: 40;
