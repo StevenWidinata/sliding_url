@@ -10,6 +10,8 @@ import { createDetail } from './detail.js'
 import { createIntro } from './intro.js'
 import { createAudio } from './audio.js'
 import { createLiving } from './living.js'
+import { createPlacards } from './placards.js'
+import { fetchStatus, statusInfo, statusDot } from './status.js'
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4
@@ -51,6 +53,29 @@ async function boot() {
   detail = createDetail({ projects, gallery, hud, reducedMotion })
 
   createLiving({ gallery, detail, projects, reducedMotion })
+
+  // live status: placards on the wall, caption, and detail view
+  const placards = createPlacards({ gallery, projects })
+  placards.setTheme(themeName)
+  let sites // undefined while checking
+  const statusHtml = (pi) => {
+    const info = statusInfo(projects[pi], sites)
+    return `${statusDot(info.state)}<span>${info.label}</span>`
+  }
+  const refreshStatusText = () => {
+    if (gallery.current >= 0) hud.setStatus(statusHtml(gallery.current))
+    if (detail.current >= 0) {
+      detail.statusEl.innerHTML = statusHtml(detail.current)
+      detail.statusEl.hidden = false
+    }
+  }
+  gallery.on('center', refreshStatusText)
+  detail.on('fill', refreshStatusText)
+  fetchStatus().then((s) => {
+    sites = s
+    placards.setSites(s)
+    refreshStatusText()
+  })
 
   // sound
   const soundPill = addPill(hud.pills, {

@@ -11,6 +11,7 @@ export function createHud(root, projects, { onPrev, onNext, onOpen }) {
     <div class="caption" aria-live="polite">
       <p class="caption__meta"><span class="caption__no"></span><span class="caption__kicker"></span></p>
       <h1 class="caption__title"></h1>
+      <p class="caption__status"></p>
       <button class="caption__enter" type="button">Enter the project <span aria-hidden="true">→</span></button>
     </div>
     <button class="arrow arrow--prev" type="button" aria-label="Previous project">←</button>
@@ -42,6 +43,9 @@ export function createHud(root, projects, { onPrev, onNext, onOpen }) {
         caption.classList.toggle('is-soon', !p.url)
         caption.classList.remove('is-swapping')
       }, 140)
+    },
+    setStatus(html) {
+      $('.caption__status').innerHTML = html
     },
     hideHint() {
       $('.hint').classList.add('is-hidden')

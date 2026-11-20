@@ -195,8 +195,22 @@
   line-height: 1.05;
 }
 
+.caption__status {
+  margin: 8px 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .caption__enter {
-  margin-top: 10px;
+  margin-top: 6px;
   appearance: none;
   background: none;
   border: 0;
@@ -214,11 +228,6 @@
 .caption__enter:hover {
   color: var(--ink);
   border-color: var(--ink);
-}
-
-.caption.is-soon .caption__enter::after {
-  content: '  ·  Coming soon';
-  color: var(--soon);
 }
 
 .arrow {
