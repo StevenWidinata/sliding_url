@@ -15,13 +15,13 @@ import { createPlacards } from './placards.js'
 import { fetchStatus, statusInfo, statusDot } from './status.js'
 import { createIndexView } from './indexview.js'
 import { createPalette } from './palette.js'
+import { createTheme, THEME_ICONS } from './theme.js'
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4
 const hasWebGL = webglAvailable()
 
-const themeName = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-document.documentElement.dataset.theme = themeName
+const theme = createTheme()
 
 const manager = new THREE.LoadingManager()
 const audio = createAudio()
@@ -55,7 +55,7 @@ async function boot() {
   const gallery = hasWebGL
     ? createGallery({ container: document.getElementById('stage'), projects, manager, reducedMotion, lowPower })
     : galleryStub()
-  gallery.setTheme(themeName)
+  gallery.setTheme(theme.current)
 
   let detail = null
   const open = (pi) => detail && detail.open(pi)
@@ -100,7 +100,7 @@ async function boot() {
 
   // live status: placards on the wall, caption, index, search and detail view
   const placards = hasWebGL ? createPlacards({ gallery, projects }) : null
-  placards?.setTheme(themeName)
+  placards?.setTheme(theme.current)
   let sites // undefined while checking
   const statusHtml = (pi) => {
     const info = statusInfo(projects[pi], sites)
@@ -121,6 +121,26 @@ async function boot() {
     index.setSites(s)
     palette.setSites(s)
     refreshStatusText()
+  })
+
+  // light / dark
+  const themePill = addPill(hud.pills, { label: '', onClick: () => theme.toggle(), order: 3 })
+  const syncTheme = (name) => {
+    themePill.innerHTML = THEME_ICONS[name]
+    const label = name === 'dark' ? 'Switch to the white gallery (T)' : 'Switch to the night gallery (T)'
+    themePill.setAttribute('aria-label', label)
+    themePill.title = label
+  }
+  syncTheme(theme.current)
+  theme.onChange((name, animate) => {
+    syncTheme(name)
+    gallery.setTheme(name, animate)
+    placards?.setTheme(name)
+  })
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() !== 't' || e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.target instanceof HTMLElement && e.target.closest('input, textarea')) return
+    if (entered) theme.toggle()
   })
 
   // sound

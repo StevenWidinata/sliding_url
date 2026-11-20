@@ -20,7 +20,7 @@ export const PALETTES = {
   },
   dark: {
     bg: '#0c0c0e', wall: '#1d1c20', floor: '#111113', ceiling: '#0e0e10', frame: '#050505',
-    cove: '#ffdcaa', shadow: 0.55, pool: 1.0, floorOverlay: 0.66, fogNear: 0.85, fogFar: 1.9,
+    cove: '#c9a87a', shadow: 0.55, pool: 0.85, floorOverlay: 0.66, fogNear: 0.85, fogFar: 1.9,
   },
 }
 
@@ -41,16 +41,20 @@ function shadowTexture() {
 }
 
 function poolTexture() {
+  // a soft cone of light from a ceiling spot: elliptical, fading to nothing at every edge
   const c = document.createElement('canvas')
   c.width = 256
   c.height = 512
   const ctx = c.getContext('2d')
-  const g = ctx.createRadialGradient(128, -40, 10, 128, 120, 300)
-  g.addColorStop(0, 'rgba(255,240,215,0.95)')
-  g.addColorStop(0.45, 'rgba(255,225,185,0.35)')
+  ctx.translate(128, 40)
+  ctx.scale(1, 2.6)
+  const g = ctx.createRadialGradient(0, 0, 4, 0, 30, 118)
+  g.addColorStop(0, 'rgba(255,238,210,0.9)')
+  g.addColorStop(0.35, 'rgba(255,226,186,0.38)')
+  g.addColorStop(0.75, 'rgba(255,220,175,0.08)')
   g.addColorStop(1, 'rgba(255,220,170,0)')
   ctx.fillStyle = g
-  ctx.fillRect(0, 0, 256, 512)
+  ctx.fillRect(-128, -40, 256, 512)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t
@@ -118,7 +122,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   scene.add(ceiling)
 
   const coveMat = new THREE.MeshBasicMaterial({ fog: false })
-  const cove = new THREE.Mesh(new THREE.TorusGeometry(R - 0.25, 0.035, 6, 256), coveMat)
+  const cove = new THREE.Mesh(new THREE.TorusGeometry(R - 0.25, 0.02, 6, 256), coveMat)
   cove.rotation.x = Math.PI / 2
   cove.position.y = CEIL_Y - 0.5
   scene.add(cove)
@@ -158,7 +162,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   const borderGeo = new THREE.BoxGeometry(FRAME_W + BORDER * 2, FRAME_H + BORDER * 2, 0.09)
   const posterGeo = new THREE.PlaneGeometry(FRAME_W, FRAME_H)
   const shadowGeo = new THREE.PlaneGeometry(FRAME_W * 1.75, FRAME_H * 1.95)
-  const poolGeo = new THREE.PlaneGeometry(FRAME_W * 1.5, FRAME_H * 3.2)
+  const poolGeo = new THREE.PlaneGeometry(FRAME_W * 1.45, FRAME_H * 2.9)
 
   const ring = new THREE.Group()
   scene.add(ring)
@@ -181,7 +185,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const shadow = new THREE.Mesh(shadowGeo, shadowMat)
     shadow.position.set(0, -0.16, -0.08)
     const pool = new THREE.Mesh(poolGeo, poolMat)
-    pool.position.set(0, FRAME_H * 0.75, -0.075)
+    pool.position.set(0, FRAME_H * 0.55, -0.075)
     g.add(pool, shadow, art)
     ring.add(g)
 
@@ -191,24 +195,61 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     slots.push({ s, pi, group: g, art, poster, hover: 0 })
   }
 
-  // ---------- theme ----------
+  // ---------- theme (cross-fades between palettes) ----------
+  const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'frame', 'cove']
+  const NUM_KEYS = ['shadow', 'pool', 'floorOverlay', 'fogNear', 'fogFar']
+  const cur = { c: {}, n: {} }
+  COLOR_KEYS.forEach((k) => (cur.c[k] = new THREE.Color(PALETTES.light[k])))
+  NUM_KEYS.forEach((k) => (cur.n[k] = PALETTES.light[k]))
   let theme = 'light'
-  function setTheme(name) {
+  let themeTween = null
+
+  function applyPalette() {
+    const { c, n } = cur
+    renderer.setClearColor(c.bg)
+    scene.fog.color.copy(c.bg)
+    wallMat.color.copy(c.wall)
+    ceilMat.color.copy(c.ceiling)
+    floorMat.color.copy(c.floor)
+    floorMat.opacity = n.floorOverlay
+    frameMat.color.copy(c.frame)
+    coveMat.color.copy(c.cove)
+    shadowMat.opacity = n.shadow
+    poolMat.opacity = n.pool
+    poolMat.visible = n.pool > 0.01
+    scene.fog.near = baseDist * n.fogNear
+    scene.fog.far = baseDist + R * n.fogFar
+  }
+
+  function setTheme(name, animate = false) {
     theme = name
-    const p = PALETTES[name]
-    renderer.setClearColor(p.bg)
-    scene.fog.color.set(p.bg)
-    wallMat.color.set(p.wall)
-    ceilMat.color.set(p.ceiling)
-    floorMat.color.set(p.floor)
-    floorMat.opacity = p.floorOverlay
-    frameMat.color.set(p.frame)
-    coveMat.color.set(p.cove)
+    const to = PALETTES[name]
     cove.visible = name === 'dark'
-    shadowMat.opacity = p.shadow
-    poolMat.opacity = p.pool
-    poolMat.visible = p.pool > 0
-    layout()
+    if (!animate || reducedMotion) {
+      COLOR_KEYS.forEach((k) => cur.c[k].set(to[k]))
+      NUM_KEYS.forEach((k) => (cur.n[k] = to[k]))
+      themeTween = null
+      applyPalette()
+      return
+    }
+    themeTween = {
+      t: 0,
+      fromC: Object.fromEntries(COLOR_KEYS.map((k) => [k, cur.c[k].clone()])),
+      fromN: { ...cur.n },
+      toC: Object.fromEntries(COLOR_KEYS.map((k) => [k, new THREE.Color(to[k])])),
+      toN: to,
+    }
+  }
+
+  function stepTheme(dt) {
+    if (!themeTween) return
+    const tw = themeTween
+    tw.t = Math.min(1, tw.t + dt / 0.7)
+    const e = tw.t * tw.t * (3 - 2 * tw.t)
+    COLOR_KEYS.forEach((k) => cur.c[k].lerpColors(tw.fromC[k], tw.toC[k], e))
+    NUM_KEYS.forEach((k) => (cur.n[k] = tw.fromN[k] + (tw.toN[k] - tw.fromN[k]) * e))
+    applyPalette()
+    if (tw.t >= 1) themeTween = null
   }
 
   // ---------- layout ----------
@@ -229,9 +270,8 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     d = Math.max(d, FRAME_H / (0.42 * 2 * tanHalf)) // never taller than 42% of the screen
     baseDist = THREE.MathUtils.clamp(d, 4, R * 1.85)
     slotPx = ((FRAME_W * SPACING) / (2 * tanHalf * aspect * baseDist)) * width
-    const p = PALETTES[theme]
-    scene.fog.near = baseDist * p.fogNear
-    scene.fog.far = baseDist + R * p.fogFar
+    scene.fog.near = baseDist * cur.n.fogNear
+    scene.fog.far = baseDist + R * cur.n.fogFar
     camera.updateProjectionMatrix()
     if (reflector) {
       const pr = renderer.getPixelRatio() * 0.5
@@ -413,6 +453,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
         done()
       }
     }
+    stepTheme(rawDt)
     if (intro.t < 1) intro.t = Math.min(1, intro.t + rawDt / intro.dur)
     const walk = intro.t < 1 ? 1 - easeInOut(intro.t) : 0
 
