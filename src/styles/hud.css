@@ -281,6 +281,13 @@
   .brand__text em {
     display: none;
   }
+  .pills {
+    right: 14px;
+    gap: 6px;
+  }
+  .pill {
+    padding: 0 9px;
+  }
   .caption {
     bottom: max(13vh, 96px);
   }
@@ -293,5 +300,14 @@
     bottom: 34px;
     font-size: 9px;
     letter-spacing: 0.14em;
+  }
+}
+
+@media (max-width: 460px) {
+  .brand {
+    left: 16px;
+  }
+  .brand__text {
+    display: none;
   }
 }

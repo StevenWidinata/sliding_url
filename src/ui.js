@@ -16,7 +16,7 @@ export function createHud(root, projects, { onPrev, onNext, onOpen }) {
     </div>
     <button class="arrow arrow--prev" type="button" aria-label="Previous project">←</button>
     <button class="arrow arrow--next" type="button" aria-label="Next project">→</button>
-    <p class="hint">Scroll, drag or use ← → to walk the gallery</p>
+    <p class="hint">${matchMedia('(pointer: coarse)').matches ? 'Swipe to explore' : 'Scroll, drag or use ← → to walk the gallery'}</p>
     <nav class="sr-only" aria-label="All projects">
       <ul>${projects
         .map((p) => `<li>${p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${p.title}</a>` : `${p.title} (coming soon)`}</li>`)
