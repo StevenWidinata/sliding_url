@@ -486,9 +486,15 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   let perfLevel = 0
   function adaptQuality(dt) {
     if (perfLevel >= 2 || document.hidden) return
+    // gaps this long mean the browser is throttling us (background/occluded window), not a slow GPU
+    if (dt > 0.2) {
+      perfFrames = 0
+      perfTime = 0
+      return
+    }
     perfFrames++
     perfTime += dt
-    if (perfFrames < 45 && perfTime < 1.5) return
+    if (perfFrames < 60) return
     const avg = perfTime / perfFrames
     perfFrames = 0
     perfTime = 0
