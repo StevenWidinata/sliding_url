@@ -5,9 +5,10 @@ import './styles/detail.css'
 import './styles/intro.css'
 import { projects } from './projects.js'
 import { createGallery } from './gallery.js'
-import { createHud } from './ui.js'
+import { createHud, addPill } from './ui.js'
 import { createDetail } from './detail.js'
 import { createIntro } from './intro.js'
+import { createAudio } from './audio.js'
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4
@@ -16,7 +17,9 @@ const themeName = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 
 document.documentElement.dataset.theme = themeName
 
 const manager = new THREE.LoadingManager()
-const enterHooks = []
+const audio = createAudio()
+const enterHooks = [() => audio.start()]
+let entered = false
 let enter = () => {}
 createIntro({ manager, count: projects.length, reducedMotion, onEnter: () => enter() })
 
@@ -46,11 +49,35 @@ async function boot() {
   gallery.on('interact', () => hud.hideHint())
   detail = createDetail({ projects, gallery, hud, reducedMotion })
 
+  // sound
+  const soundPill = addPill(hud.pills, {
+    label: `<span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="pill__text">Sound</span>`,
+    onClick: () => audio.toggle(),
+    order: 3,
+  })
+  soundPill.classList.add('pill--sound')
+  const syncSound = (muted) => {
+    soundPill.classList.toggle('is-muted', muted)
+    soundPill.setAttribute('aria-label', muted ? 'Turn sound on (M)' : 'Mute sound (M)')
+    soundPill.title = muted ? 'Turn sound on (M)' : 'Mute sound (M)'
+  }
+  syncSound(audio.muted)
+  audio.onChange(syncSound)
+  gallery.on('center', () => entered && audio.tick())
+  detail.on('open', () => audio.chime(true))
+  detail.on('close', () => audio.chime(false))
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() !== 'm' || e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.target instanceof HTMLElement && e.target.closest('input, textarea')) return
+    if (entered) audio.toggle()
+  })
+
   gallery.setInteractive(false)
   hud.setVisible(false)
   gallery.start()
 
   enter = () => {
+    entered = true
     enterHooks.forEach((fn) => fn())
     gallery.playIntro(2.8)
     setTimeout(
