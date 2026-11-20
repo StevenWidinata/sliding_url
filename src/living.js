@@ -22,13 +22,34 @@ export function createLiving({ gallery, detail, projects, reducedMotion }) {
     v.setAttribute('aria-hidden', 'true')
     v.preload = 'auto'
     v.src = videoSrc(projects[pi])
-    const tex = new THREE.VideoTexture(v)
+    // Frames are copied through a 2D canvas so colours match the still posters exactly
+    // (direct video uploads to WebGL can wash out on some GPUs/browsers).
+    const canvas = document.createElement('canvas')
+    canvas.width = 960
+    canvas.height = 600
+    const ctx2d = canvas.getContext('2d')
+    const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
     const e = { v, tex, ready: false, failed: false }
+    const copyFrame = () => {
+      if (!v.paused && !v.ended) {
+        ctx2d.drawImage(v, 0, 0, canvas.width, canvas.height)
+        tex.needsUpdate = true
+        if (!e.ready) {
+          e.ready = true
+          if (active === pi) posterMats[pi].map = tex
+        }
+      }
+      schedule()
+    }
+    const schedule = () =>
+      'requestVideoFrameCallback' in v ? v.requestVideoFrameCallback(copyFrame) : requestAnimationFrame(copyFrame)
     v.addEventListener('playing', () => {
-      e.ready = true
       v.classList.add('is-playing')
-      if (active === pi) posterMats[pi].map = tex
+      if (!e.loop) {
+        e.loop = true
+        schedule()
+      }
     })
     v.addEventListener('error', () => {
       e.failed = true
