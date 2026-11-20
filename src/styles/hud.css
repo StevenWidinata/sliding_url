@@ -1,0 +1,239 @@
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  transition: opacity 0.5s var(--ease);
+}
+
+#hud.is-hidden {
+  opacity: 0;
+}
+
+#hud.is-hidden * {
+  pointer-events: none !important;
+}
+
+#hud > * {
+  pointer-events: auto;
+}
+
+/* brand, top-left like the reel's tiny logo */
+.brand {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand__mark {
+  width: 22px;
+  height: 16px;
+  border: 2.5px solid currentColor;
+  position: relative;
+}
+
+.brand__mark::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: -7px;
+  height: 2.5px;
+  background: currentColor;
+}
+
+.brand__text {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.25;
+}
+
+.brand__text em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* pills, top-right like the reel's "GALLERY" chip */
+.pills {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  right: 20px;
+  display: flex;
+  gap: 8px;
+}
+
+.pill {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--pill-bg);
+  color: var(--pill-ink);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease), background 0.3s;
+}
+
+.pill:hover {
+  transform: translateY(-1px);
+}
+
+.pill svg {
+  width: 15px;
+  height: 15px;
+}
+
+.pill[aria-pressed='true'] {
+  background: var(--button);
+  color: var(--button-ink);
+}
+
+/* caption under the centred work */
+.caption {
+  position: absolute;
+  left: 50%;
+  bottom: max(9vh, 64px);
+  transform: translateX(-50%);
+  text-align: center;
+  width: min(92vw, 640px);
+  transition: opacity 0.18s ease, transform 0.35s var(--ease);
+}
+
+.caption.is-swapping {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+}
+
+.caption__meta {
+  margin: 0 0 8px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.caption__title {
+  margin: 0;
+  font-size: clamp(20px, 2.6vw, 30px);
+  font-weight: 800;
+  font-stretch: 112%;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+
+.caption__enter {
+  margin-top: 10px;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 6px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.caption__enter:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.caption.is-soon .caption__enter::after {
+  content: '  ·  Coming soon';
+  color: var(--soon);
+}
+
+.arrow {
+  position: absolute;
+  bottom: max(9vh, 64px);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--pill-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease);
+}
+
+.arrow:hover {
+  transform: scale(1.06);
+}
+
+.arrow--prev {
+  left: max(24px, 6vw);
+}
+
+.arrow--next {
+  right: max(24px, 6vw);
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: opacity 0.8s;
+  pointer-events: none !important;
+}
+
+.hint.is-hidden {
+  opacity: 0;
+}
+
+@media (max-width: 640px) {
+  .brand__text em {
+    display: none;
+  }
+  .caption {
+    bottom: max(13vh, 96px);
+  }
+  .arrow {
+    bottom: 22px;
+    width: 40px;
+    height: 40px;
+  }
+  .hint {
+    bottom: 34px;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+  }
+}
