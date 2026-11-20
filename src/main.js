@@ -16,6 +16,7 @@ import { fetchStatus, statusInfo, statusDot } from './status.js'
 import { createIndexView } from './indexview.js'
 import { createPalette } from './palette.js'
 import { createTheme, THEME_ICONS } from './theme.js'
+import { createTilt } from './tilt.js'
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4
@@ -165,6 +166,12 @@ async function boot() {
     if (e.target instanceof HTMLElement && e.target.closest('input, textarea')) return
     if (entered) audio.toggle()
   })
+
+  // phones: tilt to look around (iOS asks permission on the Enter tap)
+  if (hasWebGL) {
+    const tilt = createTilt({ gallery, reducedMotion })
+    enterHooks.push(() => tilt.request())
+  }
 
   gallery.setInteractive(false)
   hud.setVisible(false)
