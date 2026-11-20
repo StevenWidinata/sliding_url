@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import './styles/base.css'
 import './styles/hud.css'
+import './styles/detail.css'
 import { projects } from './projects.js'
 import { createGallery } from './gallery.js'
 import { createHud } from './ui.js'
+import { createDetail } from './detail.js'
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4
@@ -25,10 +27,8 @@ async function boot() {
   })
   gallery.setTheme(themeName)
 
-  const open = (pi) => {
-    const p = projects[pi]
-    if (p.url) window.open(p.url, '_blank', 'noopener')
-  }
+  let detail = null
+  const open = (pi) => detail && detail.open(pi)
 
   const hud = createHud(document.getElementById('hud'), projects, {
     onPrev: () => gallery.prev(),
@@ -38,7 +38,16 @@ async function boot() {
   gallery.on('center', (pi) => hud.setProject(pi))
   gallery.on('open', open)
   gallery.on('interact', () => hud.hideHint())
+  detail = createDetail({ projects, gallery, hud, reducedMotion })
   gallery.start()
+
+  // deep link: /#slug opens that project
+  const fromHash = () => projects.findIndex((p) => `#${p.slug}` === location.hash)
+  const linked = fromHash()
+  if (linked >= 0) {
+    history.replaceState(null, '', location.pathname)
+    gallery.goToProject(linked).then(() => detail.open(linked))
+  }
 }
 
 boot()
