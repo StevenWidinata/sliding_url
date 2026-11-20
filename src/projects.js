@@ -67,7 +67,7 @@ export const projects = [
     kicker: 'Retro arcade hub',
     year: 2026,
     description:
-      'A hub of 17 browser games (chess, 2048, snake and more) with a retro arcade UI and cheat-proof leaderboards: the server replays every move.',
+      'A hub of arcade browser games (Connect Four, 2048, chess and more) with a retro arcade UI and cheat-proof leaderboards: the server replays every move.',
     tech: ['React', 'TypeScript', 'Rust', 'Axum', 'PostgreSQL'],
     url: 'https://zerosignal-three.vercel.app',
   },
