@@ -1,24 +1,26 @@
-// Exhibition entrance: title card + loading line, then the doors slide open into the gallery.
+// Exhibition entrance: title card over the live 3D foyer. Enter walks you through the doorway.
 export function createIntro({ manager, count, reducedMotion, onEnter }) {
   const root = document.createElement('div')
   root.className = 'intro'
   const name = 'STEVEN WIDINATA'
   root.innerHTML = `
-    <div class="intro__door intro__door--l"></div>
-    <div class="intro__door intro__door--r"></div>
     <div class="intro__content">
-      <p class="intro__kicker">Now showing · An exhibition in ${count} works</p>
-      <h1 class="intro__title" aria-label="${name}">${[...name]
-        .map((ch, i) => `<span style="--i:${i}" aria-hidden="true">${ch === ' ' ? '&nbsp;' : ch}</span>`)
-        .join('')}</h1>
-      <p class="intro__sub">— Collected Works —</p>
-      <div class="intro__load" role="progressbar" aria-label="Loading the gallery" aria-valuemin="0" aria-valuemax="100">
-        <span class="intro__bar"></span>
-      </div>
-      <button class="intro__enter" type="button" disabled>
-        <span class="intro__enter-label">Hanging the works…</span>
-      </button>
-      <p class="intro__note">Sound on for the full experience${matchMedia('(pointer: coarse)').matches ? '' : ' · Esc to leave a room'}</p>
+      <header class="intro__head">
+        <p class="intro__kicker">Now showing · An exhibition in ${count} works</p>
+        <h1 class="intro__title" aria-label="${name}">${[...name]
+          .map((ch, i) => `<span style="--i:${i}" aria-hidden="true">${ch === ' ' ? '&nbsp;' : ch}</span>`)
+          .join('')}</h1>
+        <p class="intro__sub">— Collected Works —</p>
+      </header>
+      <footer class="intro__foot">
+        <div class="intro__load" role="progressbar" aria-label="Loading the gallery" aria-valuemin="0" aria-valuemax="100">
+          <span class="intro__bar"></span>
+        </div>
+        <button class="intro__enter" type="button" disabled>
+          <span class="intro__enter-label">Hanging the works…</span>
+        </button>
+        <p class="intro__note">Sound on for the full experience${matchMedia('(pointer: coarse)').matches ? '' : ' · Esc to leave a room'}</p>
+      </footer>
     </div>
   `
   document.body.appendChild(root)
@@ -58,5 +60,10 @@ export function createIntro({ manager, count, reducedMotion, onEnter }) {
     setTimeout(() => root.remove(), reducedMotion ? 300 : 1900)
   })
 
-  return { el: root, ready }
+  return {
+    el: root,
+    ready,
+    /** The 3D foyer is drawing behind the title: let it show through. */
+    sceneReady: () => root.classList.add('has-scene'),
+  }
 }
