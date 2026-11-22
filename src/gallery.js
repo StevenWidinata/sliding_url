@@ -10,7 +10,7 @@ const FRAME_W = 2.7
 const FRAME_H = FRAME_W / POSTER_ASPECT
 const BORDER = 0.08
 const MIN_SLOTS = 20 // the ring repeats the works until it has at least this many frames
-const SPACING = 6.2 // walking distance between one work and the next
+const SPACING = 9 // walking distance between one work and the next
 const HALL_W = 7.2
 const HALL_H = 6.2
 const EYE = 1.62
@@ -509,11 +509,13 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
     const halfH = Math.atan(tanV * aspect)
     lean = aspect < 1 ? THREE.MathUtils.lerp(0.1, 0.3, clamp01((1 - aspect) / 0.5)) : 0
-    const viewAngle = THREE.MathUtils.clamp(halfH * 0.48 + lean, 0.28, 0.6)
+    const viewAngle = THREE.MathUtils.clamp(halfH * 0.6 + lean, 0.3, 0.62)
     // the walking line is off-centre, so each wall needs its own stopping distance for the same view
     const tanA = Math.tan(viewAngle)
-    viewIn = THREE.MathUtils.clamp((PATH_R - RI - STANDOFF) / tanA, 4, 10)
-    viewOut = THREE.MathUtils.clamp((RO - STANDOFF - PATH_R) / tanA, 3.5, 9)
+    // never stand so far back that the previous work (on the other wall) is still in front of you
+    const maxView = SPACING - 2.2
+    viewIn = THREE.MathUtils.clamp((PATH_R - RI - STANDOFF) / tanA, 4, maxView)
+    viewOut = THREE.MathUtils.clamp((RO - STANDOFF - PATH_R) / tanA, 3.5, maxView)
     closeDist = Math.max(FRAME_H / (2 * tanV * 0.56), FRAME_W / (2 * tanV * aspect * 0.86))
     slotPx = THREE.MathUtils.clamp(Math.min(width, height) * 0.55, 160, 480)
     camera.updateProjectionMatrix()
@@ -580,7 +582,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
       e.preventDefault()
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? height : 1
       const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * unit
-      target += THREE.MathUtils.clamp(d, -120, 120) * 0.0024
+      target += THREE.MathUtils.clamp(d, -120, 120) * 0.0032
       lastWheel = performance.now()
       emit('interact')
     },
