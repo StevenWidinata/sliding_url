@@ -8,6 +8,7 @@
   --button: #141414;
   --button-ink: #ffffff;
   --soon: #b8860b;
+  --gold: #a5803f;
   --ok: #1f9d55;
   --down: #d64545;
   --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
@@ -26,6 +27,7 @@
   --button: #f1efe9;
   --button-ink: #0c0c0e;
   --soon: #ffd23f;
+  --gold: #d9b680;
   color-scheme: dark;
 }
 

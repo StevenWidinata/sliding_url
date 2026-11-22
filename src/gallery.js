@@ -836,6 +836,10 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     get current() {
       return currentPi
     },
+    /** Which of the ring's frames you're standing at (a work hangs in several places). */
+    get currentSlot() {
+      return mod(Math.round(offset), SLOTS)
+    },
     on(type, fn) {
       listeners[type].push(fn)
     },
