@@ -4,6 +4,8 @@
 import * as THREE from 'three'
 import { Reflector } from 'three/addons/objects/Reflector.js'
 import { createPosterTextures, POSTER_ASPECT } from './posters.js'
+import { shade, shadowTexture, poolTexture, beamTexture, dotTexture, marbleTexture } from './materials.js'
+import { createFoyer } from './foyer.js'
 
 const TAU = Math.PI * 2
 const FRAME_W = 2.7
@@ -24,7 +26,7 @@ const STANDOFF = 0.1 + (OUT_W / 2) * Math.sin(FRAME_YAW)
 const LOOK_AHEAD = 9
 const DOOR_W = 3
 const DOOR_H = 3.9
-const FOYER_DEPTH = 8.5 // how far outside the door the visitor waits
+const FOYER_DEPTH = 10 // how far outside the door the visitor waits
 
 export const PALETTES = {
   light: {
@@ -53,149 +55,6 @@ const smooth = (a, b, v) => {
 const onRing = (r, th, y, out) => out.set(r * Math.sin(th), y, r * Math.cos(th))
 const radial = (th, out) => out.set(Math.sin(th), 0, Math.cos(th))
 const tangent = (th, out) => out.set(Math.cos(th), 0, -Math.sin(th))
-
-function canvasTexture(w, h, draw) {
-  const c = document.createElement('canvas')
-  c.width = w
-  c.height = h
-  draw(c.getContext('2d'), w, h)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-}
-
-const shadowTexture = () =>
-  canvasTexture(256, 256, (ctx) => {
-    // draw the rect off-canvas and keep only its blurred shadow (works everywhere, unlike ctx.filter)
-    ctx.shadowColor = 'rgba(0,0,0,1)'
-    ctx.shadowBlur = 36
-    ctx.shadowOffsetX = 1000
-    ctx.fillRect(-1000 + 56, 64, 144, 136)
-  })
-
-const poolTexture = () =>
-  canvasTexture(256, 512, (ctx) => {
-    // a soft cone of light from a ceiling spot: elliptical, fading to nothing at every edge
-    ctx.translate(128, 40)
-    ctx.scale(1, 2.6)
-    const g = ctx.createRadialGradient(0, 0, 4, 0, 30, 118)
-    g.addColorStop(0, 'rgba(255,238,210,0.9)')
-    g.addColorStop(0.35, 'rgba(255,226,186,0.38)')
-    g.addColorStop(0.75, 'rgba(255,220,175,0.08)')
-    g.addColorStop(1, 'rgba(255,220,170,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(-128, -40, 256, 512)
-  })
-
-const beamTexture = () =>
-  canvasTexture(128, 512, (ctx, w, h) => {
-    const v = ctx.createLinearGradient(0, 0, 0, h)
-    v.addColorStop(0, 'rgba(255,255,255,.95)')
-    v.addColorStop(0.6, 'rgba(255,255,255,.25)')
-    v.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = v
-    ctx.fillRect(0, 0, w, h)
-    ctx.globalCompositeOperation = 'destination-in'
-    const hz = ctx.createLinearGradient(0, 0, w, 0)
-    hz.addColorStop(0, 'rgba(0,0,0,0)')
-    hz.addColorStop(0.5, 'rgba(0,0,0,1)')
-    hz.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = hz
-    ctx.fillRect(0, 0, w, h)
-  })
-
-const dotTexture = () =>
-  canvasTexture(64, 64, (ctx) => {
-    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
-    g.addColorStop(0, 'rgba(255,255,255,1)')
-    g.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, 64, 64)
-  })
-
-const spillTexture = () =>
-  canvasTexture(256, 256, (ctx, w, h) => {
-    // light falling out of the doorway: narrow at the door, spreading toward the visitor
-    ctx.beginPath()
-    ctx.moveTo(w * 0.33, 0)
-    ctx.lineTo(w * 0.67, 0)
-    ctx.lineTo(w, h)
-    ctx.lineTo(0, h)
-    ctx.closePath()
-    const g = ctx.createLinearGradient(0, 0, 0, h)
-    g.addColorStop(0, 'rgba(255,255,255,.85)')
-    g.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = g
-    ctx.fill()
-  })
-
-/** Polished marble: soft clouding and fine veins, drawn so the tile repeats without seams. */
-function marbleTexture() {
-  const S = 1024
-  const t = canvasTexture(S, S, (ctx) => {
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, S, S)
-    const wrapDraw = (draw) => {
-      for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) {
-        ctx.save()
-        ctx.translate(dx, dy)
-        draw()
-        ctx.restore()
-      }
-    }
-    let seed = 7
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    for (let i = 0; i < 70; i++) {
-      const x = rnd() * S, y = rnd() * S, r = 60 + rnd() * 180, a = 0.025 + rnd() * 0.035
-      wrapDraw(() => {
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-        g.addColorStop(0, `rgba(120,114,104,${a})`)
-        g.addColorStop(1, 'rgba(120,114,104,0)')
-        ctx.fillStyle = g
-        ctx.fillRect(x - r, y - r, r * 2, r * 2)
-      })
-    }
-    for (let v = 0; v < 9; v++) {
-      const pts = []
-      let x = rnd() * S, y = rnd() * S, ang = rnd() * Math.PI * 2
-      let turn = 0
-      for (let k = 0; k < 110; k++) {
-        pts.push([x, y])
-        turn = turn * 0.85 + (rnd() - 0.5) * 0.08 // slow, flowing bends
-        ang += turn
-        x += Math.cos(ang) * 9
-        y += Math.sin(ang) * 9
-      }
-      const strength = 0.07 + rnd() * 0.1
-      for (const [w, a] of [[9, strength * 0.12], [3, strength * 0.35], [1, strength]]) {
-        wrapDraw(() => {
-          ctx.strokeStyle = `rgba(92,86,78,${a})`
-          ctx.lineWidth = w
-          ctx.lineJoin = ctx.lineCap = 'round'
-          ctx.beginPath()
-          pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)))
-          ctx.stroke()
-        })
-      }
-    }
-  })
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(9, 9)
-  t.anisotropy = 8
-  return t
-}
-
-/** Grayscale vertex shading so plain MeshBasicMaterials still read as a lit room. */
-function shade(geo, fn) {
-  const pos = geo.attributes.position
-  const colors = new Float32Array(pos.count * 3)
-  for (let i = 0; i < pos.count; i++) {
-    const v = fn(pos.getX(i), pos.getY(i), pos.getZ(i))
-    colors.set([v, v, v], i * 3)
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  return geo
-}
 
 export function createGallery({ container, projects, manager, reducedMotion = false, lowPower = false }) {
   const N = projects.length
@@ -470,66 +329,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   lintel.position.set(0, DOOR_H + (HALL_H - DOOR_H) / 2, 0.19)
   door.add(lintel)
 
-  const foyerMat = (color) => new THREE.MeshBasicMaterial({ color, fog: false })
-  const facadeShape = new THREE.Shape()
-  facadeShape.moveTo(-7.5, -0.2)
-  facadeShape.lineTo(7.5, -0.2)
-  facadeShape.lineTo(7.5, 6)
-  facadeShape.lineTo(-7.5, 6)
-  facadeShape.lineTo(-7.5, -0.2)
-  const hole = new THREE.Path()
-  hole.moveTo(-DOOR_W / 2, 0)
-  hole.lineTo(-DOOR_W / 2, DOOR_H)
-  hole.lineTo(DOOR_W / 2, DOOR_H)
-  hole.lineTo(DOOR_W / 2, 0)
-  hole.lineTo(-DOOR_W / 2, 0)
-  facadeShape.holes.push(hole)
-  const facadeGeo = shade(new THREE.ShapeGeometry(facadeShape), (x, y) => {
-    // a little brighter around the door, as if lit by what's inside
-    const d = Math.hypot(x / 1.6, (y - DOOR_H * 0.5) / 2.2)
-    return 0.55 + 0.45 * Math.exp(-d * d * 0.35)
-  })
-  const facade = new THREE.Mesh(facadeGeo, new THREE.MeshBasicMaterial({ color: 0x1b191c, vertexColors: true, fog: false }))
-  facade.position.z = 0.75
-  door.add(facade)
-  const fFloor = new THREE.Mesh(new THREE.PlaneGeometry(15, 12), foyerMat(0x0b0a0c))
-  fFloor.rotation.x = -Math.PI / 2
-  fFloor.position.set(0, 0, 0.75 + 6)
-  const fCeil = new THREE.Mesh(new THREE.PlaneGeometry(15, 12), foyerMat(0x09080a))
-  fCeil.rotation.x = Math.PI / 2
-  fCeil.position.set(0, 6, 0.75 + 6)
-  door.add(fFloor, fCeil)
-  for (const x of [-1, 1]) {
-    const w = new THREE.Mesh(new THREE.PlaneGeometry(12, 6.4), foyerMat(0x0d0c0e))
-    w.rotation.y = -x * Math.PI / 2
-    w.position.set(x * 7.5, 3, 0.75 + 6)
-    door.add(w)
-  }
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(15, 6.4), foyerMat(0x0a090b))
-  back.rotation.y = Math.PI
-  back.position.set(0, 3, 12.75)
-  door.add(back)
-  const trimMat = foyerMat(0xf3e7d1)
-  const trims = [
-    [0.03, DOOR_H, -DOOR_W / 2, DOOR_H / 2],
-    [0.03, DOOR_H, DOOR_W / 2, DOOR_H / 2],
-    [DOOR_W + 0.03, 0.03, 0, DOOR_H],
-  ]
-  for (const [w, h, x, y] of trims) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.02), trimMat)
-    m.position.set(x, y, 0.77)
-    door.add(m)
-  }
-  const spill = new THREE.Mesh(
-    new THREE.PlaneGeometry(6.4, 6.4),
-    new THREE.MeshBasicMaterial({
-      color: 0xffe9c8, map: spillTexture(), transparent: true, opacity: 0.4, depthWrite: false,
-      blending: THREE.AdditiveBlending, fog: false,
-    }),
-  )
-  spill.rotation.x = -Math.PI / 2
-  spill.position.set(0, 0.012, 0.75 + 3.2)
-  door.add(spill)
+  const foyer = createFoyer({ door, projects, lowPower, doorW: DOOR_W, doorH: DOOR_H })
 
   // ---------- theme (cross-fades between palettes) ----------
   const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'sky', 'line', 'guide', 'base', 'brass', 'mat', 'bevel', 'panel', 'groove']
@@ -799,7 +599,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const r = THREE.MathUtils.lerp(RO + FOYER_DEPTH, PATH_R, k1)
     const th = THREE.MathUtils.lerp(THETA_DOOR, pathAngle(offset), k2)
     onRing(r, th, EYE, camPos)
-    onRing(r - 12, th, EYE + 0.35, v1) // looking in through the door
+    onRing(r - 12, th, EYE + 2, v1) // looking in through the door, a little upward
     onRing(PATH_R, th + LOOK_AHEAD / PATH_R, EYE + 0.15, v2) // looking along the hall
     camLook.lerpVectors(v1, v2, kl)
     // a slow idle sway while waiting outside
@@ -849,6 +649,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
       }
     }
     stepTheme(rawDt)
+    foyer.update(time, intro.u < 1)
     if (intro.playing && intro.u < 1) intro.u = Math.min(1, intro.u + rawDt / intro.dur)
 
     // hover lift
