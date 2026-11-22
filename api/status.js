@@ -21,9 +21,18 @@ async function check(url) {
   }
 }
 
+// A connection that times out or drops once is usually the network, not the site:
+// try once more before painting the dot red for every visitor for the next minute.
+async function checkWithRetry(url) {
+  const first = await check(url)
+  if (first.ok || first.code !== 0) return first
+  const second = await check(url)
+  return second.ok ? second : first
+}
+
 export async function GET() {
   const live = projects.filter((p) => p.url)
-  const entries = await Promise.all(live.map(async (p) => [p.slug, await check(p.url)]))
+  const entries = await Promise.all(live.map(async (p) => [p.slug, await checkWithRetry(p.url)]))
   return Response.json(
     { checkedAt: new Date().toISOString(), sites: Object.fromEntries(entries) },
     {
