@@ -509,7 +509,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
     const halfH = Math.atan(tanV * aspect)
     lean = aspect < 1 ? THREE.MathUtils.lerp(0.1, 0.3, clamp01((1 - aspect) / 0.5)) : 0
-    const viewAngle = THREE.MathUtils.clamp(halfH * 0.6 + lean, 0.3, 0.62)
+    const viewAngle = THREE.MathUtils.clamp(halfH * 0.5 + lean, 0.3, 0.62)
     // the walking line is off-centre, so each wall needs its own stopping distance for the same view
     const tanA = Math.tan(viewAngle)
     // never stand so far back that the previous work (on the other wall) is still in front of you
