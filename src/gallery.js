@@ -10,7 +10,7 @@ const FRAME_W = 2.7
 const FRAME_H = FRAME_W / POSTER_ASPECT
 const BORDER = 0.08
 const MIN_SLOTS = 20 // the ring repeats the works until it has at least this many frames
-const SPACING = 9 // walking distance between one work and the next
+const SPACING = 7.6 // walking distance between one work and the next
 const HALL_W = 7.2
 const HALL_H = 6.2
 const EYE = 1.62
@@ -25,12 +25,12 @@ const FOYER_DEPTH = 8.5 // how far outside the door the visitor waits
 export const PALETTES = {
   light: {
     bg: '#d8d0c4', wall: '#e8e1d6', floor: '#cbc1b2', ceiling: '#ddd5c9', frame: '#161412', sky: '#fffcf5',
-    line: '#7fb2dc', guide: '#b8915a', bench: '#bdb2a2', base: '#b9ae9e',
+    line: '#7fb2dc', guide: '#b8915a', base: '#b9ae9e',
     shadow: 0.24, pool: 0.24, cone: 0.035, shaft: 0.09, dust: 0.14, floorOverlay: 0.86, fogNear: 16, fogFar: 72,
   },
   dark: {
     bg: '#0e0c0a', wall: '#3a342d', floor: '#171410', ceiling: '#1a1714', frame: '#060505', sky: '#e8dcc8',
-    line: '#a9d6ff', guide: '#d9b680', bench: '#2b2621', base: '#1f1b17',
+    line: '#a9d6ff', guide: '#d9b680', base: '#1f1b17',
     shadow: 0.5, pool: 0.85, cone: 0.13, shaft: 0.32, dust: 0.7, floorOverlay: 0.72, fogNear: 7, fogFar: 38,
   },
 }
@@ -143,7 +143,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   const RC = (SLOTS * SPACING) / TAU // centre line of the hall
   const RI = RC - HALL_W / 2
   const RO = RC + HALL_W / 2
-  const PATH_R = RC + 0.5 // the visitor walks a little off-centre, past the benches
+  const PATH_R = RC // the visitor walks down the middle of the hall
   const THETA_DOOR = -2 * STEP // opposite an inner work, between two outer works
 
   const listeners = { center: [], open: [], interact: [] }
@@ -246,7 +246,6 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   const coneMat = new THREE.MeshBasicMaterial({
     color: 0xffe9c8, map: beamMap, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   })
-  const benchMat = new THREE.MeshBasicMaterial()
 
   const borderGeo = new THREE.BoxGeometry(FRAME_W + BORDER * 2, FRAME_H + BORDER * 2, 0.08)
   const posterGeo = new THREE.PlaneGeometry(FRAME_W, FRAME_H)
@@ -254,8 +253,6 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   const poolGeo = new THREE.PlaneGeometry(FRAME_W * 1.5, FRAME_H * 3.1)
   const coneH = HALL_H - 0.9
   const coneGeo = new THREE.CylinderGeometry(0.1, 1.35, coneH, 32, 1, true)
-  const seatGeo = new THREE.BoxGeometry(2.1, 0.09, 0.6)
-  const plinthGeo = new THREE.BoxGeometry(1.7, 0.38, 0.42)
 
   const v1 = new THREE.Vector3()
   const v2 = new THREE.Vector3()
@@ -303,20 +300,6 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     border.userData.slot = s
     hitTargets.push(poster, border)
     slots.push({ s, pi, inner, group: g, art, poster, face, hover: 0 })
-
-    // a bench every few bays, on the inner side of the walking line
-    if (s % 4 === 1) {
-      const bench = new THREE.Group()
-      const bth = (s + 0.5) * STEP
-      onRing(RC - 1.55, bth, 0, bench.position)
-      bench.lookAt(v1.copy(bench.position).add(radial(bth, v2)))
-      const seat = new THREE.Mesh(seatGeo, benchMat)
-      seat.position.y = 0.43
-      const plinth = new THREE.Mesh(plinthGeo, benchMat)
-      plinth.position.y = 0.19
-      bench.add(seat, plinth)
-      scene.add(bench)
-    }
   }
 
   // light falling from the skylight, between the works (faded out as you walk through them)
@@ -429,7 +412,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   door.add(spill)
 
   // ---------- theme (cross-fades between palettes) ----------
-  const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'frame', 'sky', 'line', 'guide', 'bench', 'base']
+  const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'frame', 'sky', 'line', 'guide', 'base']
   const NUM_KEYS = ['shadow', 'pool', 'cone', 'shaft', 'dust', 'floorOverlay', 'fogNear', 'fogFar']
   const cur = { c: {}, n: {} }
   COLOR_KEYS.forEach((k) => (cur.c[k] = new THREE.Color(PALETTES.light[k])))
@@ -454,7 +437,6 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     skyMat.color.copy(c.sky)
     lineMat.color.copy(c.line)
     guideMat.color.copy(c.guide)
-    benchMat.color.copy(c.bench)
     shadowMat.opacity = n.shadow
     poolMat.opacity = n.pool
     poolMat.visible = n.pool > 0.01
