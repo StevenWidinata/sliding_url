@@ -8,7 +8,11 @@ import { createPosterTextures, POSTER_ASPECT } from './posters.js'
 const TAU = Math.PI * 2
 const FRAME_W = 2.7
 const FRAME_H = FRAME_W / POSTER_ASPECT
-const BORDER = 0.08
+const MAT = 0.22 // white mat around each work
+const GOLD = 0.07 // slim gold frame around the mat
+const BORDER = MAT + GOLD
+const OUT_W = FRAME_W + BORDER * 2
+const OUT_H = FRAME_H + BORDER * 2
 const MIN_SLOTS = 20 // the ring repeats the works until it has at least this many frames
 const SPACING = 7.6 // walking distance between one work and the next
 const HALL_W = 7.2
@@ -16,7 +20,7 @@ const HALL_H = 6.2
 const EYE = 1.62
 const FRAME_Y = 2.2
 const FRAME_YAW = THREE.MathUtils.degToRad(18) // works turn a little toward the approaching visitor
-const STANDOFF = 0.1 + (FRAME_W / 2) * Math.sin(FRAME_YAW)
+const STANDOFF = 0.1 + (OUT_W / 2) * Math.sin(FRAME_YAW)
 const LOOK_AHEAD = 9
 const DOOR_W = 3
 const DOOR_H = 3.9
@@ -24,14 +28,16 @@ const FOYER_DEPTH = 8.5 // how far outside the door the visitor waits
 
 export const PALETTES = {
   light: {
-    bg: '#d8d0c4', wall: '#e8e1d6', floor: '#cbc1b2', ceiling: '#ddd5c9', frame: '#161412', sky: '#fffcf5',
+    bg: '#d8d0c4', wall: '#e8e1d6', floor: '#d9d1c4', ceiling: '#ddd5c9', sky: '#fffcf5',
+    brass: '#b8954f', mat: '#f4f0e8', bevel: '#e3dccf', panel: '#e1d9cc', groove: '#bdb2a1',
     line: '#7fb2dc', guide: '#b8915a', base: '#b9ae9e',
-    shadow: 0.24, pool: 0.24, cone: 0.035, shaft: 0.09, dust: 0.14, floorOverlay: 0.86, fogNear: 16, fogFar: 72,
+    shadow: 0.24, pool: 0.24, shaft: 0.09, dust: 0.14, floorOverlay: 0.86, fogNear: 16, fogFar: 72,
   },
   dark: {
-    bg: '#0e0c0a', wall: '#3a342d', floor: '#171410', ceiling: '#1a1714', frame: '#060505', sky: '#e8dcc8',
+    bg: '#0e0c0a', wall: '#3a342d', floor: '#26221d', ceiling: '#1a1714', sky: '#e8dcc8',
+    brass: '#a7834a', mat: '#d6cfc2', bevel: '#b8b0a2', panel: '#332e28', groove: '#191613',
     line: '#a9d6ff', guide: '#d9b680', base: '#1f1b17',
-    shadow: 0.5, pool: 0.85, cone: 0.13, shaft: 0.32, dust: 0.7, floorOverlay: 0.72, fogNear: 7, fogFar: 38,
+    shadow: 0.5, pool: 0.85, shaft: 0.32, dust: 0.7, floorOverlay: 0.72, fogNear: 7, fogFar: 38,
   },
 }
 
@@ -122,6 +128,62 @@ const spillTexture = () =>
     ctx.fillStyle = g
     ctx.fill()
   })
+
+/** Polished marble: soft clouding and fine veins, drawn so the tile repeats without seams. */
+function marbleTexture() {
+  const S = 1024
+  const t = canvasTexture(S, S, (ctx) => {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, S, S)
+    const wrapDraw = (draw) => {
+      for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) {
+        ctx.save()
+        ctx.translate(dx, dy)
+        draw()
+        ctx.restore()
+      }
+    }
+    let seed = 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * S, y = rnd() * S, r = 60 + rnd() * 180, a = 0.025 + rnd() * 0.035
+      wrapDraw(() => {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+        g.addColorStop(0, `rgba(120,114,104,${a})`)
+        g.addColorStop(1, 'rgba(120,114,104,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(x - r, y - r, r * 2, r * 2)
+      })
+    }
+    for (let v = 0; v < 9; v++) {
+      const pts = []
+      let x = rnd() * S, y = rnd() * S, ang = rnd() * Math.PI * 2
+      let turn = 0
+      for (let k = 0; k < 110; k++) {
+        pts.push([x, y])
+        turn = turn * 0.85 + (rnd() - 0.5) * 0.08 // slow, flowing bends
+        ang += turn
+        x += Math.cos(ang) * 9
+        y += Math.sin(ang) * 9
+      }
+      const strength = 0.07 + rnd() * 0.1
+      for (const [w, a] of [[9, strength * 0.12], [3, strength * 0.35], [1, strength]]) {
+        wrapDraw(() => {
+          ctx.strokeStyle = `rgba(92,86,78,${a})`
+          ctx.lineWidth = w
+          ctx.lineJoin = ctx.lineCap = 'round'
+          ctx.beginPath()
+          pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)))
+          ctx.stroke()
+        })
+      }
+    }
+  })
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(9, 9)
+  t.anisotropy = 8
+  return t
+}
 
 /** Grayscale vertex shading so plain MeshBasicMaterials still read as a lit room. */
 function shade(geo, fn) {
@@ -223,7 +285,9 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const d = Math.abs(Math.hypot(x, y) - RC) / (HALL_W / 2)
     return 1 - d * d * 0.14
   })
-  const floorMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: !!reflector, depthWrite: false })
+  const floorMat = new THREE.MeshBasicMaterial({
+    map: marbleTexture(), vertexColors: true, transparent: !!reflector, depthWrite: false,
+  })
   const floor = new THREE.Mesh(floorGeo, floorMat)
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
@@ -235,24 +299,57 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   guide.position.y = 0.01
   scene.add(guide)
 
-  // ---------- frames ----------
+  // brass details: a picture rail along both walls and an inlaid line in the floor beside them
+  const brassMat = new THREE.MeshBasicMaterial()
+  const brassBackMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide })
+  const RAIL_Y = HALL_H - 1.1
+  scene.add(new THREE.Mesh(new THREE.CylinderGeometry(RI + 0.03, RI + 0.03, 0.05, 360, 1, true).translate(0, RAIL_Y, 0), brassMat))
+  scene.add(
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(RO - 0.03, RO - 0.03, 0.05, 360, 1, true, THETA_DOOR + gap / 2, TAU - gap).translate(0, RAIL_Y, 0),
+      brassBackMat,
+    ),
+  )
+  for (const [a, b] of [[RI + 0.34, RI + 0.37], [RO - 0.37, RO - 0.34]]) {
+    const inlay = new THREE.Mesh(new THREE.RingGeometry(a, b, 720, 1), brassMat)
+    inlay.rotation.x = -Math.PI / 2
+    inlay.position.y = 0.004
+    scene.add(inlay)
+  }
+
+  // ---------- frames: slim gold frame, white mat, the work ----------
   const posterTextures = createPosterTextures(projects, manager, renderer)
   const posterMats = posterTextures.map((map) => new THREE.MeshBasicMaterial({ map, toneMapped: false }))
-  const frameMat = new THREE.MeshBasicMaterial()
+  const goldMat = new THREE.MeshBasicMaterial({ vertexColors: true })
+  const matMat = new THREE.MeshBasicMaterial({ vertexColors: true })
+  const bevelMat = new THREE.MeshBasicMaterial()
+  const lampGlowMat = new THREE.MeshBasicMaterial({ color: 0xfff1d6, fog: false })
   const shadowMat = new THREE.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false, color: 0x000000 })
   const poolMat = new THREE.MeshBasicMaterial({
     map: poolMap, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   })
-  const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xffe9c8, map: beamMap, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-  })
+  // recessed wall panels behind each work: a panel inside a thin shadow groove
+  const panelMat = new THREE.MeshBasicMaterial()
+  const panelBackMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide })
+  const grooveMat = new THREE.MeshBasicMaterial()
+  const grooveBackMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide })
 
-  const borderGeo = new THREE.BoxGeometry(FRAME_W + BORDER * 2, FRAME_H + BORDER * 2, 0.08)
+  // lit from the picture light above: a touch brighter at the top
+  const topLit = (lo, hi, h) => (x, y) => lo + (hi - lo) * clamp01(y / h + 0.5)
+  const borderGeo = shade(new THREE.BoxGeometry(OUT_W, OUT_H, 0.09, 1, 6, 1), topLit(0.6, 1.15, OUT_H))
+  const matGeo = shade(new THREE.PlaneGeometry(FRAME_W + MAT * 2, FRAME_H + MAT * 2, 1, 8), topLit(0.84, 1.03, FRAME_H + MAT * 2))
+  const bevelGeo = new THREE.PlaneGeometry(FRAME_W + 0.035, FRAME_H + 0.035)
   const posterGeo = new THREE.PlaneGeometry(FRAME_W, FRAME_H)
-  const shadowGeo = new THREE.PlaneGeometry(FRAME_W * 1.6, FRAME_H * 1.9)
-  const poolGeo = new THREE.PlaneGeometry(FRAME_W * 1.5, FRAME_H * 3.1)
-  const coneH = HALL_H - 0.9
-  const coneGeo = new THREE.CylinderGeometry(0.1, 1.35, coneH, 32, 1, true)
+  const shadowGeo = new THREE.PlaneGeometry(OUT_W * 1.5, OUT_H * 1.75)
+  const poolGeo = new THREE.PlaneGeometry(OUT_W * 1.45, OUT_H * 2.6)
+  // picture light: a brass bar on two arms, glowing underneath
+  const LAMP_W = FRAME_W * 0.6
+  const lampBarGeo = new THREE.CylinderGeometry(0.034, 0.034, LAMP_W, 16).rotateZ(Math.PI / 2)
+  const lampArmGeo = new THREE.CylinderGeometry(0.011, 0.011, 0.34, 8)
+  const lampGlowGeo = new THREE.PlaneGeometry(LAMP_W * 0.94, 0.045)
+  const PANEL_W = OUT_W + 1.5
+  const PANEL_Y0 = 0.55
+  const PANEL_H = RAIL_Y - 0.3 - PANEL_Y0
 
   const v1 = new THREE.Vector3()
   const v2 = new THREE.Vector3()
@@ -268,7 +365,16 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const face = n.clone().multiplyScalar(Math.cos(FRAME_YAW)).addScaledVector(t, -Math.sin(FRAME_YAW))
     const wallR = inner ? RI : RO
 
-    // on the wall: soft shadow + the glow of the spotlight
+    // the recessed panel this work hangs on
+    for (const [grow, inset, front, back] of [[0.05, 0.006, grooveMat, grooveBackMat], [0, 0.012, panelMat, panelBackMat]]) {
+      const r = inner ? wallR + inset : wallR - inset
+      const span = (PANEL_W + grow) / r
+      const geo = new THREE.CylinderGeometry(r, r, PANEL_H + grow, 24, 1, true, th - span / 2, span)
+      geo.translate(0, PANEL_Y0 + PANEL_H / 2, 0)
+      scene.add(new THREE.Mesh(geo, inner ? front : back))
+    }
+
+    // on the wall: soft shadow + the glow of the picture light
     const wall = new THREE.Group()
     onRing(wallR, th, FRAME_Y, wall.position).addScaledVector(n, 0.02)
     wall.lookAt(v1.copy(wall.position).add(n))
@@ -284,21 +390,35 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     onRing(wallR, th, FRAME_Y, g.position).addScaledVector(n, STANDOFF)
     g.lookAt(v1.copy(g.position).add(face))
     const art = new THREE.Group() // scaled on hover
-    const border = new THREE.Mesh(borderGeo, frameMat)
+    const border = new THREE.Mesh(borderGeo, goldMat)
+    const mat = new THREE.Mesh(matGeo, matMat)
+    mat.position.z = 0.046
+    const bevel = new THREE.Mesh(bevelGeo, bevelMat)
+    bevel.position.z = 0.047
     const poster = new THREE.Mesh(posterGeo, posterMats[pi])
-    poster.position.z = 0.042
-    art.add(border, poster)
-    g.add(art)
+    poster.position.z = 0.048
+    art.add(border, mat, bevel, poster)
+
+    const lamp = new THREE.Group()
+    lamp.position.set(0, OUT_H / 2 + 0.17, 0.32)
+    lamp.add(new THREE.Mesh(lampBarGeo, brassMat))
+    for (const x of [-LAMP_W * 0.3, LAMP_W * 0.3]) {
+      const arm = new THREE.Mesh(lampArmGeo, brassMat)
+      arm.position.set(x, -0.085, -0.16)
+      arm.rotation.x = Math.atan2(0.32, 0.17)
+      lamp.add(arm)
+    }
+    const glow = new THREE.Mesh(lampGlowGeo, lampGlowMat)
+    glow.rotation.x = Math.PI / 2
+    glow.position.y = -0.035
+    lamp.add(glow)
+    g.add(art, lamp)
     scene.add(g)
 
-    // spotlight beam from the ceiling
-    const cone = new THREE.Mesh(coneGeo, coneMat)
-    onRing(wallR, th, 0.9 + coneH / 2, cone.position).addScaledVector(n, 1.1)
-    scene.add(cone)
-
-    poster.userData.slot = s
-    border.userData.slot = s
-    hitTargets.push(poster, border)
+    for (const m of [poster, mat, border]) {
+      m.userData.slot = s
+      hitTargets.push(m)
+    }
     slots.push({ s, pi, inner, group: g, art, poster, face, hover: 0 })
   }
 
@@ -412,8 +532,8 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   door.add(spill)
 
   // ---------- theme (cross-fades between palettes) ----------
-  const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'frame', 'sky', 'line', 'guide', 'base']
-  const NUM_KEYS = ['shadow', 'pool', 'cone', 'shaft', 'dust', 'floorOverlay', 'fogNear', 'fogFar']
+  const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'sky', 'line', 'guide', 'base', 'brass', 'mat', 'bevel', 'panel', 'groove']
+  const NUM_KEYS = ['shadow', 'pool', 'shaft', 'dust', 'floorOverlay', 'fogNear', 'fogFar']
   const cur = { c: {}, n: {} }
   COLOR_KEYS.forEach((k) => (cur.c[k] = new THREE.Color(PALETTES.light[k])))
   NUM_KEYS.forEach((k) => (cur.n[k] = PALETTES.light[k]))
@@ -433,14 +553,21 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     ceilMat.color.copy(c.ceiling)
     floorMat.color.copy(c.floor)
     floorMat.opacity = n.floorOverlay
-    frameMat.color.copy(c.frame)
+    goldMat.color.copy(c.brass)
+    brassMat.color.copy(c.brass)
+    brassBackMat.color.copy(c.brass)
+    matMat.color.copy(c.mat)
+    bevelMat.color.copy(c.bevel)
+    panelMat.color.copy(c.panel)
+    panelBackMat.color.copy(c.panel)
+    grooveMat.color.copy(c.groove)
+    grooveBackMat.color.copy(c.groove)
     skyMat.color.copy(c.sky)
     lineMat.color.copy(c.line)
     guideMat.color.copy(c.guide)
     shadowMat.opacity = n.shadow
     poolMat.opacity = n.pool
     poolMat.visible = n.pool > 0.01
-    coneMat.opacity = n.cone
     dustMat.opacity = n.dust
   }
 
