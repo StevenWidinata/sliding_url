@@ -1,6 +1,7 @@
 // Project detail view: the poster flies out of the wall to the centre (reel frame aa3),
 // then slides left as the info column appears (reel frames aa2/aa1).
 import { posterSrc } from './posters.js'
+import { GITHUB_ICON, repoInfo } from './github.js'
 
 const pad = (n) => String(n).padStart(2, '0')
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -37,8 +38,12 @@ export function createDetail({ projects, gallery, hud, reducedMotion }) {
         <dl class="detail__rows">
           <div class="detail__row"><dt>Built with</dt><dd class="detail__tech"></dd></div>
           <div class="detail__row"><dt>Address</dt><dd class="detail__host"></dd></div>
+          <div class="detail__row detail__row--source"><dt>Source</dt><dd class="detail__source"></dd></div>
         </dl>
-        <a class="detail__visit" target="_blank" rel="noopener"></a>
+        <div class="detail__actions">
+          <a class="detail__visit" target="_blank" rel="noopener"></a>
+          <a class="detail__code" target="_blank" rel="noopener">${GITHUB_ICON}<span>View code</span></a>
+        </div>
       </div>
     </div>
   `
@@ -92,6 +97,17 @@ export function createDetail({ projects, gallery, hud, reducedMotion }) {
       visit.setAttribute('aria-disabled', 'true')
       visit.setAttribute('tabindex', '-1')
       visit.textContent = 'Not live yet · coming soon'
+    }
+    const repo = repoInfo(p)
+    const code = $('.detail__code')
+    code.hidden = !repo
+    $('.detail__row--source').hidden = !repo
+    if (repo) {
+      code.href = repo.url
+      code.setAttribute('aria-label', `View the code of ${p.title} on GitHub`)
+      $('.detail__source').innerHTML = `<a href="${repo.url}" target="_blank" rel="noopener">github.com/${repo.path}</a>${
+        repo.team ? `<span class="chip chip--team">Team repo</span>` : ''
+      }`
     }
     root.classList.toggle('is-soon', !p.url)
     midcap.innerHTML = `<span>${p.kicker}</span><em>${p.title}</em>`
