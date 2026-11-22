@@ -3,7 +3,7 @@
 //        npm run capture recallzy   (only the given slugs)
 import { chromium } from 'playwright'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir, tmpdir } from 'node:os'
 import { projects } from '../src/projects.js'
@@ -23,6 +23,43 @@ function findFfmpeg() {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// Per-site steps that run after the page loads, so the poster shows the app doing its job
+// instead of an empty start screen.
+const STEPS = {
+  async trustped(page) {
+    // analyse the site's own example store and film the result
+    const input = page.locator('input').first()
+    await input.pressSequentially('11111', { delay: 60 })
+    const done = page.waitForResponse((r) => r.url().includes('/api/predict'), { timeout: 150000 })
+    await page.getByRole('button', { name: /analisis/i }).click()
+    await done
+    await sleep(2000)
+  },
+  async acel_academy(page) {
+    // everything is behind a login; use the demo account from .env.local (never committed)
+    const { ACEL_DEMO_EMAIL: email, ACEL_DEMO_PASSWORD: password } = process.env
+    if (!email || !password) {
+      console.warn('\n  no ACEL_DEMO_EMAIL / ACEL_DEMO_PASSWORD in .env.local; capturing the login page')
+      return
+    }
+    await page.fill('input[type=email]', email)
+    await page.fill('input[type=password]', password)
+    await page.click('button[type=submit]')
+    await page.waitForURL(/dashboard/, { timeout: 60000 })
+    await page.waitForLoadState('networkidle').catch(() => {})
+    await sleep(2500)
+  },
+}
+
+// load KEY=value pairs from .env.local (for demo logins) without adding a dependency
+try {
+  const envFile = new URL('../.env.local', import.meta.url)
+  for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]
+  }
+} catch {}
 
 async function smoothScroll(page, seconds) {
   // Glide down over most of the clip, then ease back up, so the loop is roughly seamless.
@@ -58,6 +95,7 @@ async function captureOne(browser, project, ffmpeg) {
     await page.goto(project.url, { waitUntil: 'load', timeout: 45000 })
   }
   await sleep(3500) // let intros/animations settle
+  if (STEPS[project.slug]) await STEPS[project.slug](page)
   await page.screenshot({ path: join(OUT, `${project.slug}.jpg`), type: 'jpeg', quality: 82 })
   const startOffset = (Date.now() - t0) / 1000
   await smoothScroll(page, CLIP_SECONDS)
