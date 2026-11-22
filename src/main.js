@@ -11,7 +11,7 @@ import { createDetail } from './detail.js'
 import { createIntro } from './intro.js'
 import { createAudio } from './audio.js'
 import { createLiving } from './living.js'
-import { createPlacards } from './placards.js'
+import { createNameplates } from './nameplates.js'
 import { fetchStatus, statusInfo, statusDot } from './status.js'
 import { createIndexView } from './indexview.js'
 import { createPalette } from './palette.js'
@@ -99,9 +99,9 @@ async function boot() {
 
   if (hasWebGL) createLiving({ gallery, detail, projects, reducedMotion })
 
-  // live status: placards on the wall, caption, index, search and detail view
-  const placards = hasWebGL ? createPlacards({ gallery, projects }) : null
-  placards?.setTheme(theme.current)
+  // live status: nameplates on the wall, caption, index, search and detail view
+  const nameplates = hasWebGL ? createNameplates({ gallery, projects }) : null
+  nameplates?.setTheme(theme.current)
   let sites // undefined while checking
   const statusHtml = (pi) => {
     const info = statusInfo(projects[pi], sites)
@@ -118,7 +118,7 @@ async function boot() {
   detail.on('fill', refreshStatusText)
   fetchStatus().then((s) => {
     sites = s
-    placards?.setSites(s)
+    nameplates?.setSites(s)
     index.setSites(s)
     palette.setSites(s)
     refreshStatusText()
@@ -136,7 +136,7 @@ async function boot() {
   theme.onChange((name, animate) => {
     syncTheme(name)
     gallery.setTheme(name, animate)
-    placards?.setTheme(name)
+    nameplates?.setTheme(name)
   })
   window.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() !== 't' || e.ctrlKey || e.metaKey || e.altKey) return
@@ -176,7 +176,8 @@ async function boot() {
   gallery.setInteractive(false)
   hud.setVisible(false)
   gallery.start()
-  if (!hasWebGL) intro.ready()
+  if (hasWebGL) requestAnimationFrame(() => intro.sceneReady())
+  else intro.ready()
 
   enter = () => {
     entered = true
