@@ -166,7 +166,7 @@ export function createDetail({ projects, gallery, hud, reducedMotion }) {
 
     let start = opts.fromRect
     if (!start) {
-      await gallery.dollyTo(0.42, 0.55)
+      await gallery.dollyTo(0.8, 0.9) // turn to face the work and walk up to it
       start = gallery.centerRect()
     }
     flyer.appendChild(media)
@@ -218,7 +218,7 @@ export function createDetail({ projects, gallery, hud, reducedMotion }) {
     slot.appendChild(media)
     isOpen = false
     if (!returnRect) {
-      await gallery.dollyTo(0, 0.6)
+      await gallery.dollyTo(0, 0.8)
       gallery.setInteractive(true)
       hud.setVisible(true)
     }
