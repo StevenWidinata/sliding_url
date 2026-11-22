@@ -223,15 +223,20 @@
   color: var(--muted);
 }
 
+/* the longest word always fits on one line (--longest is set from JS) */
+.detail__info {
+  container-type: inline-size;
+}
+
 .detail__title {
   margin: 12px 0 8px;
-  font-size: clamp(40px, 5.2vw, 82px);
+  font-size: min(clamp(40px, 5.2vw, 82px), calc(100cqi / (var(--longest, 6) * 1.02)));
   font-weight: 800;
   font-stretch: 120%;
   line-height: 0.92;
   letter-spacing: -0.01em;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .detail__year {

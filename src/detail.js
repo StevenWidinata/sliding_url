@@ -81,6 +81,7 @@ export function createDetail({ projects, gallery, hud, reducedMotion }) {
     $('.detail__count').textContent = `No. ${pad(pi + 1)} / ${pad(N)}`
     $('.detail__kicker').textContent = p.kicker
     $('.detail__title').textContent = p.title
+    $('.detail__title').style.setProperty('--longest', Math.max(...p.title.split(/\s+/).map((w) => w.length)))
     $('.detail__year').textContent = `${p.year}${p.url ? '' : ' · in progress'}`
     $('.detail__desc').textContent = p.description
     $('.detail__tech').innerHTML = p.tech.map((t) => `<span class="chip">${t}</span>`).join('')
