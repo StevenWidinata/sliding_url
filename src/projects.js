@@ -69,6 +69,17 @@ export const projects = [
     github: 'StevenWidinata/recallzy',
   },
   {
+    slug: 'sketchy',
+    title: 'Sketchy',
+    kicker: 'Multiplayer drawing game',
+    year: 2026,
+    description:
+      'A realtime drawing and guessing game for 2 to 20 friends. One player draws a word, everyone else races to guess it in chat. Share a 5-letter code and play in any browser, no sign-up. Every drawing replays as a timelapse at the end.',
+    tech: ['React', 'TypeScript', 'Supabase Realtime', 'Vercel Functions', 'Canvas 2D'],
+    url: 'https://sketchy-swart.vercel.app',
+    github: 'StevenWidinata/sketchy',
+  },
+  {
     slug: 'zero_signal',
     title: 'Zero Signal',
     kicker: 'Retro arcade hub',
