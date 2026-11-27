@@ -4,7 +4,7 @@ A 3D museum that doubles as a directory of all my projects. Walk through a doorw
 
 ## Features
 
-- **Doorway entrance**: a dark 3D foyer with the show's title lettered above a lit doorway, and every work hung salon-style on the wall beside it, each with a brass number plate. Through the door you see No. 01. Enter walks you into the hall; click a work on the wall to walk straight to it.
+- **Doorway entrance**: a dark 3D foyer with a coffered ceiling, two crystal chandeliers and a red runner up to a classical doorway (fluted marble columns, marble urns), the show's title lettered above it, and every work hung salon-style on the wall beside it, each with a brass number plate. Through the door you see No. 01. Enter walks you into the hall; click a work on the wall to walk straight to it.
 - **Curved museum hall** (Three.js): a ring-shaped hall with no end. Works hang zig-zag on recessed panels on the inner and outer walls, each in a slim gold frame with a white mat under a brass picture light, with a skylight, light beams, drifting dust, a brass picture rail, and brass inlays and a guide light in a polished marble floor. Scroll, swipe up, drag or use ↑ ↓ to walk; you stop softly at each work, and phones lean toward it.
 - **Step up to a work**: the camera turns to face it and walks up close, then the frame lifts off the wall into a detail page with **Visit site** and **View code** (GitHub). Deep links work: `/#glitch_type`.
 - **Brass nameplates** under every work: the name engraved, its number and a live status dot, with a glint that moves as you walk past.
