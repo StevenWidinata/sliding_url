@@ -65,9 +65,9 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   const RI = RC - HALL_W / 2
   const RO = RC + HALL_W / 2
   const PATH_R = RC // the visitor walks down the middle of the hall
-  const THETA_DOOR = -2 * STEP // opposite an inner work, between two outer works
+  const THETA_DOOR = 0 // opposite the first work (inner wall), between two outer works
 
-  const listeners = { center: [], open: [], interact: [] }
+  const listeners = { center: [], open: [], interact: [], foyerPick: [] }
   const emit = (type, ...args) => listeners[type].forEach((fn) => fn(...args))
 
   // ---------- renderer / scene ----------
@@ -329,7 +329,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   lintel.position.set(0, DOOR_H + (HALL_H - DOOR_H) / 2, 0.19)
   door.add(lintel)
 
-  const foyer = createFoyer({ door, projects, lowPower, doorW: DOOR_W, doorH: DOOR_H })
+  const foyer = createFoyer({ door, projects, posterTextures, lowPower, reducedMotion, doorW: DOOR_W, doorH: DOOR_H })
 
   // ---------- theme (cross-fades between palettes) ----------
   const COLOR_KEYS = ['bg', 'wall', 'floor', 'ceiling', 'sky', 'line', 'guide', 'base', 'brass', 'mat', 'bevel', 'panel', 'groove']
@@ -484,6 +484,29 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     return hit && hit.distance < 30 ? hit.object.userData.slot : -1
   }
 
+  // in the foyer, before entering: the works on the wall can be pointed at and picked
+  let foyerPickable = false
+  let foyerHover = -1
+  const inFoyer = () => foyerPickable && intro.u === 0 && !intro.playing
+  function pickFoyer(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect()
+    ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1)
+    raycaster.setFromCamera(ndc, camera)
+    const hit = raycaster.intersectObjects(foyer.hitTargets, false)[0]
+    return hit ? hit.object.userData.pi : -1
+  }
+  function setFoyerHover(pi) {
+    if (pi === foyerHover) return
+    foyerHover = pi
+    foyer.setHover(pi)
+    canvas.style.cursor = pi >= 0 ? 'pointer' : ''
+  }
+  canvas.addEventListener('click', (e) => {
+    if (!inFoyer()) return
+    const pi = pickFoyer(e.clientX, e.clientY)
+    if (pi >= 0) emit('foyerPick', pi)
+  })
+
   canvas.addEventListener(
     'wheel',
     (e) => {
@@ -529,6 +552,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
       }
       return
     }
+    if (inFoyer()) return setFoyerHover(pickFoyer(e.clientX, e.clientY))
     if (!interactive) return
     const s = pick(e.clientX, e.clientY)
     if (s !== hovered) {
@@ -557,6 +581,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
   canvas.addEventListener('pointerup', endDrag)
   canvas.addEventListener('pointercancel', endDrag)
   canvas.addEventListener('pointerleave', () => {
+    if (inFoyer()) setFoyerHover(-1)
     if (!down) {
       hovered = -1
       canvas.style.cursor = ''
@@ -599,7 +624,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
     const r = THREE.MathUtils.lerp(RO + FOYER_DEPTH, PATH_R, k1)
     const th = THREE.MathUtils.lerp(THETA_DOOR, pathAngle(offset), k2)
     onRing(r, th, EYE, camPos)
-    onRing(r - 12, th, EYE + 2, v1) // looking in through the door, a little upward
+    onRing(r - 12, th, EYE + (width < height ? 1.3 : 2), v1) // looking in through the door, a little upward (less on portrait)
     onRing(PATH_R, th + LOOK_AHEAD / PATH_R, EYE + 0.15, v2) // looking along the hall
     camLook.lerpVectors(v1, v2, kl)
     // a slow idle sway while waiting outside
@@ -649,7 +674,7 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
       }
     }
     stepTheme(rawDt)
-    foyer.update(time, intro.u < 1)
+    foyer.update(rawDt, intro.u < 1)
     if (intro.playing && intro.u < 1) intro.u = Math.min(1, intro.u + rawDt / intro.dur)
 
     // hover lift
@@ -772,12 +797,18 @@ export function createGallery({ container, projects, manager, reducedMotion = fa
         canvas.style.cursor = ''
       }
     },
+    /** Let the works on the foyer wall be pointed at and clicked (once the entrance is ready). */
+    setFoyerPickable(v) {
+      foyerPickable = v
+      if (!v) setFoyerHover(-1)
+    },
     setTilt(yaw, pitch) {
       tilt.yaw = yaw
       tilt.pitch = pitch
     },
     /** Walk in from the foyer, through the doorway. */
     playIntro(dur = 2.8) {
+      setFoyerHover(-1)
       if (reducedMotion) {
         intro.u = 1
         return

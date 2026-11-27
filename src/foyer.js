@@ -1,24 +1,36 @@
 // The entrance foyer outside the hall's doorway: a dark stone room with a lit door surround,
-// brass wall lights, exhibition banners, two sculptures on plinths, a rope line and a marble floor.
+// the show's title lettered above the door, every work hung salon-style on the facade with a
+// brass number plate under it, a rope line and a marble floor.
 // Everything is drawn in the door's local space: x along the wall, y up, z out toward the visitor.
 import * as THREE from 'three'
 import { Reflector } from 'three/addons/objects/Reflector.js'
-import { canvasTexture, poolTexture, beamTexture, spillTexture, marbleTexture, shade } from './materials.js'
-import { posterSrc } from './posters.js'
+import { canvasTexture, beamTexture, spillTexture, marbleTexture, shadowTexture, shade } from './materials.js'
+import { drawBrass, engrave } from './nameplates.js'
+import { POSTER_ASPECT } from './posters.js'
 
 const HALF_W = 10
 const DEPTH = 14
 const HEIGHT = 7.5
 const WALL_Z = 0.75 // the facade, just outside the hall's outer wall
-const BANNER_X = 5
-const BANNER_W = 1.9
-const BANNER_H = 3.6
-const BANNER_TOP = 4.95
-const PLINTH_X = 2.8
-const PLINTH_Z = WALL_Z + 1.6
-const BANNER_SLUGS = ['glitch_type', 'mewing_academy']
 
-/** A matcap: a lit sphere painted once, so metal and velvet look shaded without any lights. */
+// the hang: each side of the door is a cluster of columns, stacked works sharing one height
+const HANG_NEAR = 3.2 // inner edge of each cluster (clear of the door and its wall lights)
+const HANG_FAR = 8 // outer edge
+const HANG_Y = 2.55 // the line every column centres on
+const HANG_H = 2.6 // height of the stacked columns, before fitting
+const GUTTER = 0.2
+const LARGE_H = 1.6 // the single work nearest the door
+const COLUMNS = [3, 2, 1] // works per column, far edge → door (mirrored on the right)
+const MAT = 0.08 // white mat, as a share of the image width
+const GOLD = 0.028 // gilt edge, same
+const OUT_RATIO = (1 + 2 * (MAT + GOLD)) / (1 / POSTER_ASPECT + 2 * (MAT + GOLD)) // outer width / height
+
+const PLATE_W = 0.24
+const PLATE_H = 0.085
+const LIFT = 0.09 // how far a work comes off the wall when pointed at
+const GLOW = 0.12 // its light, at rest (pointed at: GLOW + 0.3)
+
+/** A matcap: a lit sphere painted once, so metal looks shaded without any lights. */
 function matcap(stops, shine = 0.9) {
   return canvasTexture(256, 256, (ctx) => {
     const g = ctx.createRadialGradient(100, 88, 4, 128, 128, 128)
@@ -48,80 +60,57 @@ const glowTexture = () =>
     ctx.fillRect(-64, -64, 128, 128)
   })
 
-const discTexture = () =>
-  canvasTexture(128, 128, (ctx) => {
-    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
-    g.addColorStop(0, 'rgba(255,255,255,0.8)')
-    g.addColorStop(0.5, 'rgba(255,255,255,0.22)')
-    g.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, 128, 128)
+/**
+ * Where each work hangs on one side of the door, as columns of [{ x, y, w }]: x measured
+ * outward from the door, w the outer frame width. Far column first, each top to bottom.
+ */
+function hangColumns() {
+  const cols = COLUMNS.map((n) => {
+    const h = n === 1 ? LARGE_H : (HANG_H - (n - 1) * GUTTER) / n
+    return { n, h, w: h * OUT_RATIO }
   })
-
-/** An exhibition banner: oxblood cloth, gold lettering, the work's screenshot in a gold rule. */
-function drawBanner(ctx, w, h, project, number, img) {
-  const g = ctx.createLinearGradient(0, 0, 0, h)
-  g.addColorStop(0, '#4a1a1f')
-  g.addColorStop(1, '#2a0d11')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, w, h)
-  // woven texture
-  for (let y = 0; y < h; y += 3) {
-    ctx.fillStyle = `rgba(0,0,0,${0.05 + Math.random() * 0.05})`
-    ctx.fillRect(0, y, w, 1)
-  }
-  const gold = '#d9b56f'
-  ctx.strokeStyle = gold
-  ctx.lineWidth = 3
-  ctx.strokeRect(26, 26, w - 52, h - 52)
-  ctx.textAlign = 'center'
-  ctx.fillStyle = gold
-  ctx.font = '700 22px Archivo, sans-serif'
-  ctx.letterSpacing = '9px'
-  ctx.fillText('NOW SHOWING', w / 2 + 4, 104)
-  ctx.fillRect(w / 2 - 30, 128, 60, 2)
-
-  const iw = w - 112
-  const ih = iw / 1.6
-  const iy = 176
-  ctx.fillStyle = '#120507'
-  ctx.fillRect(56, iy, iw, ih)
-  if (img) ctx.drawImage(img, 56, iy, iw, ih)
-  ctx.strokeStyle = gold
-  ctx.lineWidth = 4
-  ctx.strokeRect(50, iy - 6, iw + 12, ih + 12)
-
-  ctx.fillStyle = '#f5ecdc'
-  let size = 64
-  ctx.letterSpacing = '2px'
-  do {
-    ctx.font = `800 ${size}px Archivo, sans-serif`
-    size -= 2
-  } while (ctx.measureText(project.title.toUpperCase()).width > w - 110 && size > 30)
-  ctx.fillText(project.title.toUpperCase(), w / 2, iy + ih + 120)
-  ctx.letterSpacing = '0px'
-  ctx.fillStyle = gold
-  ctx.font = 'italic 400 34px Newsreader, Georgia, serif'
-  ctx.fillText(project.kicker, w / 2, iy + ih + 172)
-  ctx.font = 'italic 400 30px Newsreader, Georgia, serif'
-  ctx.fillText(`No. ${String(number).padStart(2, '0')}`, w / 2, h - 120)
-  ctx.fillRect(w / 2 - 50, h - 92, 100, 2)
+  const raw = cols.reduce((a, c) => a + c.w, 0) + GUTTER * (cols.length - 1)
+  const k = Math.min(1, (HANG_FAR - HANG_NEAR) / raw)
+  let x = HANG_FAR
+  return cols.map((c) => {
+    const w = c.w * k
+    const h = c.h * k
+    const gap = GUTTER * k
+    const stack = c.n * h + (c.n - 1) * gap
+    const col = Array.from({ length: c.n }, (_, i) => ({ x: x - w / 2, y: HANG_Y + stack / 2 - h / 2 - i * (h + gap), w }))
+    x -= w + gap
+    return col
+  })
 }
 
-export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
+/** The show's title, lettered on the stone above the door like gallery vinyl. */
+function drawTitle(ctx, w, h, sub) {
+  ctx.clearRect(0, 0, w, h)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = '#efe6d6'
+  let size = 300
+  do {
+    ctx.font = `500 ${size}px Archivo, sans-serif`
+    size -= 4
+  } while (ctx.measureText('Steven Widinata').width > w * 0.96 && size > 60)
+  ctx.fillText('Steven Widinata', w / 2, h * 0.6)
+  ctx.fillStyle = 'rgba(239, 230, 214, 0.62)'
+  ctx.font = `400 ${Math.round(size * 0.3)}px Newsreader, Georgia, serif`
+  ctx.fillText(sub, w / 2, h * 0.92)
+}
+
+export function createFoyer({ door, projects, posterTextures, lowPower, reducedMotion, doorW, doorH }) {
   const foyer = new THREE.Group()
   door.add(foyer)
   const basic = (color, extra = {}) => new THREE.MeshBasicMaterial({ color, fog: false, ...extra })
-  const add = (mesh, x, y, z) => {
+  const add = (mesh, x, y, z, parent = foyer) => {
     mesh.position.set(x, y, z)
-    foyer.add(mesh)
+    parent.add(mesh)
     return mesh
   }
   const brass = new THREE.MeshMatcapMaterial({
     matcap: matcap([[0, '#fff0c2'], [0.35, '#d8b26a'], [0.7, '#8c6728'], [1, '#2a1d0b']]), fog: false,
-  })
-  const chrome = new THREE.MeshMatcapMaterial({
-    matcap: matcap([[0, '#ffffff'], [0.3, '#cdd2da'], [0.55, '#565c66'], [0.75, '#a3aab4'], [1, '#121418']]), fog: false,
   })
   const velvet = new THREE.MeshMatcapMaterial({
     matcap: matcap([[0, '#d04a5a'], [0.5, '#86182a'], [1, '#2a060c']], 0.25), fog: false,
@@ -146,7 +135,7 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
   const facadeGeo = shade(new THREE.ShapeGeometry(facadeShape, 4), (x, y) => {
     // warmer near the door, falling off toward the corners
     const d = Math.hypot(x / 2.2, (y - doorH * 0.5) / 2.6)
-    return 0.5 + 0.5 * Math.exp(-d * d * 0.25) - Math.max(0, y - 5.5) * 0.06
+    return 0.5 + 0.5 * Math.exp(-d * d * 0.25) - Math.max(0, y - 6.2) * 0.08
   })
   add(new THREE.Mesh(facadeGeo, basic(0x221e1c, { vertexColors: true })), 0, 0, WALL_Z)
 
@@ -172,10 +161,10 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
   const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, DEPTH), basic(0x0c0b0b))
   ceiling.rotation.x = Math.PI / 2
   add(ceiling, 0, HEIGHT, floorZ)
-  for (const side of [-1, 1]) {
+  for (const s of [-1, 1]) {
     const w = new THREE.Mesh(new THREE.PlaneGeometry(DEPTH, HEIGHT + 0.4), basic(0x121010))
-    w.rotation.y = -side * Math.PI / 2
-    add(w, side * HALF_W, HEIGHT / 2, floorZ)
+    w.rotation.y = -s * Math.PI / 2
+    add(w, s * HALF_W, HEIGHT / 2, floorZ)
   }
   const back = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, HEIGHT + 0.4), basic(0x0e0d0d))
   back.rotation.y = Math.PI
@@ -184,7 +173,7 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
   // ---------- door surround: stone architrave, brass edge, glowing reveal ----------
   const stone = basic(0x3a3530)
   const post = new THREE.BoxGeometry(0.34, doorH + 0.34, 0.14)
-  for (const side of [-1, 1]) add(new THREE.Mesh(post, stone), side * (doorW / 2 + 0.17), (doorH + 0.34) / 2, WALL_Z + 0.07)
+  for (const s of [-1, 1]) add(new THREE.Mesh(post, stone), s * (doorW / 2 + 0.17), (doorH + 0.34) / 2, WALL_Z + 0.07)
   add(new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.68, 0.34, 0.14), stone), 0, doorH + 0.17, WALL_Z + 0.07)
   add(new THREE.Mesh(new THREE.BoxGeometry(doorW + 1.1, 0.1, 0.26), stone), 0, doorH + 0.39, WALL_Z + 0.13)
   const thin = (w, h, x, y, z, mat) => add(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.02), mat), x, y, z)
@@ -197,33 +186,19 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
   thin(0.025, doorH + 0.34, edgeW / 2, (doorH + 0.34) / 2, WALL_Z + 0.15, brass)
   thin(edgeW, 0.025, 0, doorH + 0.34, WALL_Z + 0.15, brass)
 
-  // ---------- panelled wall with brass lines ----------
+  // a brass line at hand height, broken by the door surround
   const line = basic(0x7d6236)
-  const panelFill = basic(0x1a1716)
   const doorEdge = doorW / 2 + 0.62
-  for (const side of [-1, 1]) {
-    // a line at hand height, broken by the door surround
+  for (const s of [-1, 1]) {
     const len = HALF_W - doorEdge
-    thin(len, 0.025, side * (doorEdge + len / 2), 0.62, WALL_Z + 0.012, line)
-    for (const [cx, w] of [[BANNER_X, 3], [8.45, 2.2]]) {
-      const y0 = 0.9
-      const y1 = 5.35
-      const ph = y1 - y0
-      const x = side * cx
-      add(new THREE.Mesh(new THREE.PlaneGeometry(w, ph), panelFill), x, y0 + ph / 2, WALL_Z + 0.005)
-      thin(w, 0.02, x, y0, WALL_Z + 0.012, line)
-      thin(w, 0.02, x, y1, WALL_Z + 0.012, line)
-      thin(0.02, ph, x - w / 2, y0 + ph / 2, WALL_Z + 0.012, line)
-      thin(0.02, ph, x + w / 2, y0 + ph / 2, WALL_Z + 0.012, line)
-    }
+    thin(len, 0.025, s * (doorEdge + len / 2), 0.62, WALL_Z + 0.012, line)
   }
-  thin(HALF_W * 2, 0.03, 0, 5.75, WALL_Z + 0.012, line)
 
   // ---------- brass wall lights beside the door ----------
   const wash = glowTexture()
   const lampShade = basic(0xffe2b0)
-  for (const side of [-1, 1]) {
-    const x = side * (doorW / 2 + 0.78)
+  for (const s of [-1, 1]) {
+    const x = s * (doorW / 2 + 0.78)
     add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.04), brass), x, 2.75, WALL_Z + 0.02)
     const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.14, 8), brass), x, 2.75, WALL_Z + 0.09)
     arm.rotation.x = Math.PI / 2
@@ -231,80 +206,88 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
     add(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 3.4), additive(wash, 0xffcf8a, 0.6)), x, 2.75, WALL_Z + 0.016)
   }
 
-  // ---------- exhibition banners ----------
-  const pool = poolTexture()
-  const banners = []
-  BANNER_SLUGS.forEach((slug, i) => {
-    let pi = projects.findIndex((p) => p.slug === slug)
-    if (pi < 0) pi = i
-    const p = projects[pi]
-    const side = i === 0 ? -1 : 1
-    const x = side * BANNER_X
-    const z = WALL_Z + 0.24
-    const c = document.createElement('canvas')
-    c.width = 512
-    c.height = Math.round((512 * BANNER_H) / BANNER_W)
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = 4
-    const paint = (img) => {
-      drawBanner(c.getContext('2d'), c.width, c.height, p, pi + 1, img)
-      tex.needsUpdate = true
-    }
-    paint(null)
-    const img = new Image()
-    img.onload = () => paint(img)
-    img.src = posterSrc(p)
+  // ---------- the title, lettered above the door ----------
+  const year = Math.max(...projects.map((p) => p.year || 0)) || new Date().getFullYear()
+  const sub = `Collected works · ${projects.length} projects · ${year}`
+  const TITLE_W = 5.6
+  const titleCanvas = document.createElement('canvas')
+  titleCanvas.width = 2048
+  titleCanvas.height = 512
+  const titleTex = new THREE.CanvasTexture(titleCanvas)
+  titleTex.colorSpace = THREE.SRGBColorSpace
+  titleTex.anisotropy = 4
+  const paintTitle = () => {
+    drawTitle(titleCanvas.getContext('2d'), titleCanvas.width, titleCanvas.height, sub)
+    titleTex.needsUpdate = true
+  }
+  paintTitle()
+  Promise.all([document.fonts.load('500 80px Archivo'), document.fonts.load('400 40px Newsreader')]).then(paintTitle, () => {})
+  const titleMat = basic(0xffffff, { map: titleTex, transparent: true, depthWrite: false })
+  add(new THREE.Mesh(new THREE.PlaneGeometry(TITLE_W, TITLE_W / 4), titleMat), 0, 5.55, WALL_Z + 0.01)
 
-    const geo = new THREE.PlaneGeometry(BANNER_W, BANNER_H, 1, 24)
-    const cloth = add(new THREE.Mesh(geo, basic(0xffffff, { map: tex, side: THREE.DoubleSide })), x, BANNER_TOP - BANNER_H / 2, z)
-    banners.push({ geo, base: geo.attributes.position.array.slice(), phase: i * 1.7, cloth })
-    const rod = add(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, BANNER_W + 0.36, 12), brass), x, BANNER_TOP + 0.03, z)
-    rod.rotation.z = Math.PI / 2
-    for (const e of [-1, 1]) {
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 12), brass), x + e * (BANNER_W / 2 + 0.2), BANNER_TOP + 0.03, z)
-      const bracket = add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.24, 8), brass), x + e * (BANNER_W / 2 + 0.05), BANNER_TOP + 0.03, WALL_Z + 0.12)
-      bracket.rotation.x = Math.PI / 2
-    }
-    // lit from above
-    add(new THREE.Mesh(new THREE.PlaneGeometry(3, 5), additive(pool, 0xffd9a0, 0.5)), x, 3.6, WALL_Z + 0.014)
-    add(new THREE.Mesh(new THREE.CircleGeometry(0.12, 24), basic(0xfff1d6)), x, HEIGHT - 0.01, WALL_Z + 1).rotation.x = Math.PI / 2
+  // ---------- the hang: every work, 01–06 left of the door and 07–12 right, read left to right ----------
+  const cols = hangColumns()
+  const layout = [
+    ...cols.flat().map((s) => ({ ...s, x: -s.x })), // left: far column first
+    ...cols.slice().reverse().flat(), // right: door column first
+  ]
+
+  const shadowMat = basic(0x000000, { map: shadowTexture(), transparent: true, depthWrite: false, opacity: 0.85 })
+  const hitTargets = []
+  const works = []
+  projects.forEach((p, pi) => {
+    const spot = layout[pi]
+    if (!spot) return // more works than places on the wall: the hall still has them all
+    const w = spot.w
+    const imgW = w / (1 + 2 * (MAT + GOLD))
+    const imgH = imgW / POSTER_ASPECT
+    const matW = imgW * (1 + 2 * MAT)
+    const matH = imgH + imgW * 2 * MAT
+    const h = imgH + imgW * 2 * (MAT + GOLD)
+
+    // the wall behind it: a soft shadow and the pool of its light
+    add(new THREE.Mesh(new THREE.PlaneGeometry(w * 1.35, h * 1.5), shadowMat), spot.x + 0.06, spot.y - 0.08, WALL_Z + 0.004)
+    const glow = add(new THREE.Mesh(new THREE.PlaneGeometry(w * 1.7, h * 2.4), additive(wash, 0xffdcaa, GLOW)), spot.x, spot.y + h * 0.2, WALL_Z + 0.006)
+
+    // gilt edge, white mat, the work
+    const art = add(new THREE.Group(), spot.x, spot.y, WALL_Z + 0.03)
+    const gilt = add(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), brass), 0, 0, 0, art)
+    const topLit = (x, y) => 0.82 + 0.18 * Math.min(1, Math.max(0, y / matH + 0.5))
+    add(new THREE.Mesh(shade(new THREE.PlaneGeometry(matW, matH, 1, 6), topLit), basic(0xf1ebe0, { vertexColors: true })), 0, 0, 0.026, art)
+    add(new THREE.Mesh(new THREE.PlaneGeometry(imgW, imgH), basic(0xffffff, { map: posterTextures[pi], toneMapped: false })), 0, 0, 0.027, art)
+    gilt.userData.pi = pi
+    hitTargets.push(gilt)
+
+    // its brass number plate
+    const c = document.createElement('canvas')
+    c.width = 256
+    c.height = Math.round((256 * PLATE_H) / PLATE_W)
+    const ctx = c.getContext('2d')
+    drawBrass(ctx, c.width, c.height)
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = '600 48px Archivo, sans-serif'
+    engrave(ctx, String(pi + 1).padStart(2, '0'), c.width / 2, c.height / 2 + 2)
+    const plateTex = new THREE.CanvasTexture(c)
+    plateTex.colorSpace = THREE.SRGBColorSpace
+    plateTex.anisotropy = 4
+    const plateY = spot.y - h / 2 - 0.035 - PLATE_H / 2
+    add(new THREE.Mesh(new THREE.BoxGeometry(PLATE_W, PLATE_H, 0.012), basic(0xffffff, { map: plateTex })), spot.x, plateY, WALL_Z + 0.01)
+
+    works.push({ pi, art, glow, hover: 0 })
   })
 
-  // ---------- sculptures on plinths ----------
-  const plinthGeo = shade(new THREE.BoxGeometry(0.72, 1.12, 0.72, 1, 6, 1), (x, y) => 0.72 + 0.28 * (y / 1.12 + 0.5))
-  const plinthMat = basic(0xe8e2d7, { vertexColors: true })
-  const plinthCap = basic(0xf1ece3)
+  // a ceiling spot washes each half of the hang
   const beam = beamTexture()
-  const disc = discTexture()
-  const sculptures = []
-  for (const side of [-1, 1]) {
-    const x = side * PLINTH_X
-    add(new THREE.Mesh(plinthGeo, plinthMat), x, 0.56, PLINTH_Z)
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.8), plinthCap), x, 1.145, PLINTH_Z)
-    const art = new THREE.Group()
-    add(art, x, 1.72, PLINTH_Z)
-    if (side < 0) {
-      art.add(new THREE.Mesh(new THREE.TorusKnotGeometry(0.27, 0.08, 220, 24, 2, 3), chrome))
-    } else {
-      // a brass gyroscope around a chrome core
-      for (let k = 0; k < 3; k++) {
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36 - k * 0.075, 0.016, 12, 120), brass)
-        ring.userData.k = k
-        art.add(ring)
-      }
-      art.add(new THREE.Mesh(new THREE.SphereGeometry(0.09, 32, 24), chrome))
-    }
-    sculptures.push({ art, side })
-    // spotlight from the ceiling
+  for (const s of [-1, 1]) {
+    const x = (s * (HANG_NEAR + HANG_FAR)) / 2
+    add(new THREE.Mesh(new THREE.PlaneGeometry(HANG_FAR - HANG_NEAR + 2.4, 5.2), additive(wash, 0xffd9a0, 0.22)), x, 3, WALL_Z + 0.002)
     const cone = add(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.95, HEIGHT - 1.25, 32, 1, true), additive(beam, 0xffe6c0, 0.11)),
-      x, 1.25 + (HEIGHT - 1.25) / 2, PLINTH_Z,
+      new THREE.Mesh(new THREE.CylinderGeometry(0.08, 1.6, HEIGHT - 0.6, 32, 1, true), additive(beam, 0xffe6c0, 0.05)),
+      x, 0.6 + (HEIGHT - 0.6) / 2, WALL_Z + 1.4,
     )
     cone.material.side = THREE.DoubleSide
-    const glowOnFloor = add(new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), additive(disc, 0xffdcaa, 0.35)), x, 0.01, PLINTH_Z)
-    glowOnFloor.rotation.x = -Math.PI / 2
-    add(new THREE.Mesh(new THREE.CircleGeometry(0.12, 24), basic(0xfff1d6)), x, HEIGHT - 0.01, PLINTH_Z).rotation.x = Math.PI / 2
+    add(new THREE.Mesh(new THREE.CircleGeometry(0.12, 24), basic(0xfff1d6)), x, HEIGHT - 0.01, WALL_Z + 1.4).rotation.x = Math.PI / 2
   }
 
   // ---------- rope line leading to the door ----------
@@ -312,8 +295,8 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
   const footGeo = new THREE.CylinderGeometry(0.15, 0.17, 0.035, 32)
   const knobGeo = new THREE.SphereGeometry(0.052, 20, 14)
   const ropeZ = [WALL_Z + 1.2, WALL_Z + 2.9, WALL_Z + 4.6]
-  for (const side of [-1, 1]) {
-    const x = side * 1.25
+  for (const s of [-1, 1]) {
+    const x = s * 1.25
     ropeZ.forEach((z, k) => {
       add(new THREE.Mesh(postGeo, brass), x, 0.47, z)
       add(new THREE.Mesh(footGeo, brass), x, 0.018, z)
@@ -322,8 +305,7 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
       const a = new THREE.Vector3(x, 0.88, ropeZ[k - 1])
       const b = new THREE.Vector3(x, 0.88, z)
       const mid = new THREE.Vector3(x, 0.52, (a.z + b.z) / 2)
-      const rope = new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 32, 0.028, 10), velvet)
-      foyer.add(rope)
+      foyer.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 32, 0.028, 10), velvet))
     })
   }
 
@@ -332,33 +314,24 @@ export function createFoyer({ door, projects, lowPower, doorW, doorH }) {
   spill.rotation.x = -Math.PI / 2
   add(spill, 0, 0.012, WALL_Z + 3.2)
 
+  let hovered = -1
   return {
-    /** Animate while the visitor is in (or can see) the foyer. */
-    update(time, active) {
+    /** The framed works, for picking: each carries userData.pi. */
+    hitTargets,
+    /** Point at a work (-1 for none): it comes a little off the wall and its light comes up. */
+    setHover(pi) {
+      hovered = pi
+    },
+    /** Ease hover states while the visitor is in (or can see) the foyer. */
+    update(dt, active) {
       if (reflector) reflector.visible = active
       floor.material.opacity = active && reflector ? 0.82 : 1
       if (!active) return
-      for (const { art, side } of sculptures) {
-        if (side < 0) {
-          art.rotation.set(time * 0.18, time * 0.32, 0)
-        } else {
-          art.children.forEach((m) => {
-            const k = m.userData.k
-            if (k === undefined) return
-            m.rotation.set(time * (0.3 + k * 0.17), time * (0.22 - k * 0.09), k * 0.6)
-          })
-        }
-        art.position.y = 1.72 + Math.sin(time * 0.9 + side) * 0.03
-      }
-      // banners sway gently; the top is held by the rod
-      for (const b of banners) {
-        const pos = b.geo.attributes.position
-        for (let i = 0; i < pos.count; i++) {
-          const y = b.base[i * 3 + 1]
-          const hang = (BANNER_H / 2 - y) / BANNER_H
-          pos.setZ(i, Math.sin(y * 1.7 + time * 1.1 + b.phase) * 0.035 * hang)
-        }
-        pos.needsUpdate = true
+      const k = 1 - Math.exp(-dt * 12)
+      for (const wk of works) {
+        wk.hover += ((wk.pi === hovered ? 1 : 0) - wk.hover) * k
+        wk.art.position.z = WALL_Z + 0.03 + (reducedMotion ? 0 : wk.hover * LIFT)
+        wk.glow.material.opacity = GLOW + wk.hover * 0.3
       }
     },
   }

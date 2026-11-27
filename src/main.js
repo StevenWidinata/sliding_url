@@ -29,7 +29,19 @@ const audio = createAudio()
 const enterHooks = [() => audio.start()]
 let entered = false
 let enter = () => {}
-const intro = createIntro({ manager, count: projects.length, reducedMotion, onEnter: () => enter() })
+// the works on the foyer wall become clickable once the entrance is ready
+let introReady = false
+let foyerTarget = null
+const intro = createIntro({
+  manager,
+  count: projects.length,
+  reducedMotion,
+  onEnter: (pi) => enter(pi),
+  onReady: () => {
+    introReady = true
+    foyerTarget?.setFoyerPickable(true)
+  },
+})
 
 /** Stand-in used when WebGL is unavailable: the Index grid becomes the whole site. */
 function galleryStub() {
@@ -40,6 +52,7 @@ function galleryStub() {
     setTheme() {},
     setInteractive() {},
     setTilt() {},
+    setFoyerPickable() {},
     playIntro() {},
     next() {},
     prev() {},
@@ -57,6 +70,9 @@ async function boot() {
     ? createGallery({ container: document.getElementById('stage'), projects, manager, reducedMotion, lowPower })
     : galleryStub()
   gallery.setTheme(theme.current)
+  foyerTarget = gallery
+  if (introReady) gallery.setFoyerPickable(true)
+  gallery.on('foyerPick', (pi) => intro.enter(pi))
 
   let detail = null
   const open = (pi) => detail && detail.open(pi)
@@ -179,8 +195,9 @@ async function boot() {
   if (hasWebGL) requestAnimationFrame(() => intro.sceneReady())
   else intro.ready()
 
-  enter = () => {
+  enter = (picked = -1) => {
     entered = true
+    gallery.setFoyerPickable(false)
     enterHooks.forEach((fn) => fn())
     gallery.playIntro(2.8)
     setTimeout(
@@ -188,12 +205,11 @@ async function boot() {
         if (!hasWebGL) return
         gallery.setInteractive(true)
         hud.setVisible(true)
-        // deep link: /#slug opens that project
-        const linked = projects.findIndex((p) => `#${p.slug}` === location.hash)
-        if (linked >= 0) {
-          history.replaceState(null, '', location.pathname)
-          gallery.goToProject(linked).then(() => detail.open(linked))
-        }
+        // a work picked on the foyer wall, or a deep link (/#slug), walks to that project and opens it
+        const fromHash = projects.findIndex((p) => `#${p.slug}` === location.hash)
+        if (fromHash >= 0) history.replaceState(null, '', location.pathname)
+        const linked = picked >= 0 ? picked : fromHash
+        if (linked >= 0) gallery.goToProject(linked).then(() => detail.open(linked))
       },
       reducedMotion ? 300 : 2600,
     )

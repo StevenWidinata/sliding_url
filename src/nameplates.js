@@ -27,7 +27,8 @@ function glintTexture() {
   return t
 }
 
-function drawBrass(ctx) {
+/** Brushed brass with a bevelled edge (also used by the foyer's number plates). */
+export function drawBrass(ctx, W = 800, H = 220) {
   // brushed brass: warm gradient, fine horizontal grain, bevelled edge
   const g = ctx.createLinearGradient(0, 0, W, H)
   g.addColorStop(0, '#8d6a30')
@@ -51,7 +52,7 @@ function drawBrass(ctx) {
 }
 
 /** Text cut into the metal: a dark fill with a thin light edge below it. */
-function engrave(ctx, text, x, y) {
+export function engrave(ctx, text, x, y) {
   ctx.fillStyle = 'rgba(255,238,196,0.55)'
   ctx.fillText(text, x, y + 2)
   ctx.fillStyle = '#3b2a10'
