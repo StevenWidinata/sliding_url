@@ -27,6 +27,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // Per-site steps that run after the page loads, so the poster shows the app doing its job
 // instead of an empty start screen.
 const STEPS = {
+  async about_me(page) {
+    // the star name and solar system take ~10 s to settle before the tagline and button appear
+    await sleep(6500)
+  },
   async trustped(page) {
     // analyse the site's own example store and film the result
     const input = page.locator('input').first()
