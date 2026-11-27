@@ -4,7 +4,8 @@
 // Everything is drawn in the door's local space: x along the wall, y up, z out toward the visitor.
 import * as THREE from 'three'
 import { Reflector } from 'three/addons/objects/Reflector.js'
-import { canvasTexture, beamTexture, spillTexture, marbleTexture, shadowTexture, shade } from './materials.js'
+import { canvasTexture, spillTexture, marbleTexture, shadowTexture, shade, matcap } from './materials.js'
+import { chandelier, column, urn, runner, coffers } from './foyerDecor.js'
 import { drawBrass, engrave } from './nameplates.js'
 import { POSTER_ASPECT } from './posters.js'
 
@@ -14,7 +15,7 @@ const HEIGHT = 7.5
 const WALL_Z = 0.75 // the facade, just outside the hall's outer wall
 
 // the hang: each side of the door is a cluster of columns, stacked works sharing one height
-const HANG_NEAR = 3.2 // inner edge of each cluster (clear of the door and its wall lights)
+const HANG_NEAR = 3.2 // inner edge of each cluster (clear of the door and its columns)
 const HANG_FAR = 8 // outer edge
 const HANG_Y = 2.55 // the line every column centres on
 const HANG_H = 2.6 // height of the stacked columns, before fitting
@@ -29,23 +30,6 @@ const PLATE_W = 0.24
 const PLATE_H = 0.085
 const LIFT = 0.09 // how far a work comes off the wall when pointed at
 const GLOW = 0.12 // its light, at rest (pointed at: GLOW + 0.3)
-
-/** A matcap: a lit sphere painted once, so metal looks shaded without any lights. */
-function matcap(stops, shine = 0.9) {
-  return canvasTexture(256, 256, (ctx) => {
-    const g = ctx.createRadialGradient(100, 88, 4, 128, 128, 128)
-    stops.forEach(([o, c]) => g.addColorStop(o, c))
-    ctx.fillStyle = g
-    ctx.beginPath()
-    ctx.arc(128, 128, 128, 0, Math.PI * 2)
-    ctx.fill()
-    const h = ctx.createRadialGradient(90, 78, 0, 90, 78, 46)
-    h.addColorStop(0, `rgba(255,255,255,${shine})`)
-    h.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = h
-    ctx.fillRect(0, 0, 256, 256)
-  })
-}
 
 const glowTexture = () =>
   canvasTexture(128, 256, (ctx) => {
@@ -194,17 +178,32 @@ export function createFoyer({ door, projects, posterTextures, lowPower, reducedM
     thin(len, 0.025, s * (doorEdge + len / 2), 0.62, WALL_Z + 0.012, line)
   }
 
-  // ---------- brass wall lights beside the door ----------
+  // ---------- a classical doorway: fluted columns carrying an entablature, an urn at each end ----------
   const wash = glowTexture()
-  const lampShade = basic(0xffe2b0)
+  const marbleStone = new THREE.MeshMatcapMaterial({
+    matcap: matcap([[0, '#fffdf8'], [0.35, '#ece5da'], [0.7, '#b3aa9d'], [1, '#4a443c']], 0.55), fog: false,
+  })
+  const COL_X = doorW / 2 + 0.8
+  const COL_H = 4.45
+  const ENT_Z = WALL_Z + 0.3
   for (const s of [-1, 1]) {
-    const x = s * (doorW / 2 + 0.78)
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.36, 0.04), brass), x, 2.75, WALL_Z + 0.02)
-    const arm = add(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.14, 8), brass), x, 2.75, WALL_Z + 0.09)
-    arm.rotation.x = Math.PI / 2
-    add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.28, 24), lampShade), x, 2.75, WALL_Z + 0.18)
-    add(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 3.4), additive(wash, 0xffcf8a, 0.6)), x, 2.75, WALL_Z + 0.016)
+    add(column({ height: COL_H }), s * COL_X, 0, ENT_Z)
+    // the light falling on the stone behind each column
+    add(new THREE.Mesh(new THREE.PlaneGeometry(1.6, 4.2), additive(wash, 0xffcf8a, 0.35)), s * COL_X, 2.4, WALL_Z + 0.016)
   }
+  const entW = COL_X * 2 + 0.7
+  add(new THREE.Mesh(new THREE.BoxGeometry(entW, 0.34, 0.56), marbleStone), 0, COL_H + 0.17, ENT_Z)
+  thin(entW, 0.02, 0, COL_H + 0.08, ENT_Z + 0.29, brass)
+  add(new THREE.Mesh(new THREE.BoxGeometry(entW + 0.3, 0.08, 0.68), marbleStone), 0, COL_H + 0.38, ENT_Z)
+  for (const s of [-1, 1]) add(urn(), s * COL_X, COL_H + 0.42, ENT_Z).scale.setScalar(0.8)
+
+  // ---------- cornice along the top of the wall, coffered ceiling ----------
+  add(new THREE.Mesh(new THREE.BoxGeometry(HALF_W * 2, 0.3, 0.34), basic(0x2e2925)), 0, HEIGHT - 0.15, WALL_Z + 0.17)
+  thin(HALF_W * 2, 0.025, 0, HEIGHT - 0.34, WALL_Z + 0.02, line)
+  add(coffers({ width: HALF_W * 2, depth: DEPTH, y: HEIGHT, brass }), 0, 0, floorZ)
+
+  // ---------- an oxblood runner from the door to where the visitor stands ----------
+  add(runner(2, DEPTH - 0.4), 0, 0.006, WALL_Z + 0.2 + (DEPTH - 0.4) / 2)
 
   // ---------- the title, lettered above the door ----------
   const year = Math.max(...projects.map((p) => p.year || 0)) || new Date().getFullYear()
@@ -223,7 +222,7 @@ export function createFoyer({ door, projects, posterTextures, lowPower, reducedM
   paintTitle()
   Promise.all([document.fonts.load('500 80px Archivo'), document.fonts.load('400 40px Newsreader')]).then(paintTitle, () => {})
   const titleMat = basic(0xffffff, { map: titleTex, transparent: true, depthWrite: false })
-  add(new THREE.Mesh(new THREE.PlaneGeometry(TITLE_W, TITLE_W / 4), titleMat), 0, 5.55, WALL_Z + 0.01)
+  add(new THREE.Mesh(new THREE.PlaneGeometry(TITLE_W, TITLE_W / 4), titleMat), 0, 6.12, WALL_Z + 0.01)
 
   // ---------- the hang: every work, 01–06 left of the door and 07–12 right, read left to right ----------
   const cols = hangColumns()
@@ -277,17 +276,11 @@ export function createFoyer({ door, projects, posterTextures, lowPower, reducedM
     works.push({ pi, art, glow, hover: 0 })
   })
 
-  // a ceiling spot washes each half of the hang
-  const beam = beamTexture()
+  // a crystal chandelier over each half of the hang, and the light it spreads on the wall
   for (const s of [-1, 1]) {
     const x = (s * (HANG_NEAR + HANG_FAR)) / 2
-    add(new THREE.Mesh(new THREE.PlaneGeometry(HANG_FAR - HANG_NEAR + 2.4, 5.2), additive(wash, 0xffd9a0, 0.22)), x, 3, WALL_Z + 0.002)
-    const cone = add(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.08, 1.6, HEIGHT - 0.6, 32, 1, true), additive(beam, 0xffe6c0, 0.05)),
-      x, 0.6 + (HEIGHT - 0.6) / 2, WALL_Z + 1.4,
-    )
-    cone.material.side = THREE.DoubleSide
-    add(new THREE.Mesh(new THREE.CircleGeometry(0.12, 24), basic(0xfff1d6)), x, HEIGHT - 0.01, WALL_Z + 1.4).rotation.x = Math.PI / 2
+    add(new THREE.Mesh(new THREE.PlaneGeometry(HANG_FAR - HANG_NEAR + 2.4, 5.6), additive(wash, 0xffd9a0, 0.26)), x, 3.4, WALL_Z + 0.002)
+    add(chandelier({ brass, ceilingY: HEIGHT - 0.22, drop: 1.05, scale: 1.15 }), s * 5, 0, WALL_Z + 1.6)
   }
 
   // ---------- rope line leading to the door ----------

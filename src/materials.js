@@ -143,3 +143,20 @@ export function shade(geo, fn) {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   return geo
 }
+
+/** A matcap: a lit sphere painted once, so metal looks shaded without any lights. */
+export function matcap(stops, shine = 0.9) {
+  return canvasTexture(256, 256, (ctx) => {
+    const g = ctx.createRadialGradient(100, 88, 4, 128, 128, 128)
+    stops.forEach(([o, c]) => g.addColorStop(o, c))
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(128, 128, 128, 0, Math.PI * 2)
+    ctx.fill()
+    const h = ctx.createRadialGradient(90, 78, 0, 90, 78, 46)
+    h.addColorStop(0, `rgba(255,255,255,${shine})`)
+    h.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = h
+    ctx.fillRect(0, 0, 256, 256)
+  })
+}
